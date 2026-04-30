@@ -8,17 +8,37 @@ st.set_page_config(
     page_title="Grok Masterpiece Architect Pro", 
     page_icon="👑", 
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed" # Diubah ke collapsed agar layar HP lebih luas saat awal buka
 )
 
-# Custom CSS
+# Custom CSS untuk Responsive Android
 st.markdown("""
     <style>
+    /* Gaya Desktop (Default) */
     .main-header { font-size: 2.8rem; font-weight: 800; color: #FFD700; text-align: center; margin-bottom: 5px; }
     .sub-header { font-size: 1.1rem; text-align: center; color: #bdc3c7; margin-bottom: 25px; }
-    .stButton>button { width: 100%; border-radius: 10px; font-weight: bold; }
+    .stButton>button { width: 100%; border-radius: 10px; font-weight: bold; background-color: #FF4B4B; color: white; border: none; height: 3em; }
     .api-container { background-color: #1e272e; padding: 20px; border-radius: 15px; border: 1px solid #3d4e5e; margin-bottom: 20px; }
     .result-card { background-color: #1e272e; padding: 20px; border-radius: 15px; border-left: 5px solid #FFD700; margin-bottom: 20px; }
+
+    /* Penyesuaian khusus untuk Android / Mobile (Layar di bawah 768px) */
+    @media (max-width: 768px) {
+        .main-header { font-size: 1.6rem !important; } /* Font judul lebih kecil agar tidak pecah */
+        .sub-header { font-size: 0.8rem !important; }
+        .api-container { padding: 15px !important; }
+        
+        /* Memaksa kolom yang tadinya bersampingan menjadi tumpuk ke bawah */
+        [data-testid="column"] {
+            width: 100% !important;
+            flex: 1 1 100% !important;
+            min-width: 100% !important;
+        }
+        
+        /* Mengurangi padding agar layar kecil tidak terasa sesak */
+        .stVideo {
+            width: 100% !important;
+        }
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -32,16 +52,15 @@ if 'api_active' not in st.session_state:
 
 # --- 3. HEADER ---
 st.markdown('<p class="main-header">👑 DAIGO SUKA APLIKASI INI</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-header">Produksi Prompt Grook AI</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-header">Produksi Prompt Grok AI</p>', unsafe_allow_html=True)
 
 # --- 4. API KEY MANAGER (SAVE & DELETE) ---
 with st.container():
-    col_k1, col_k2, col_k3 = st.columns([1, 2, 1])
+    col_k1, col_k2, col_k3 = st.columns([1, 4, 1]) # Diperlebar kolom tengahnya untuk mobile
     with col_k2:
         st.markdown('<div class="api-container">', unsafe_allow_html=True)
-        st.markdown("### 🔑 MASUKAN API KEY KAMAU")
+        st.markdown("### 🔑 MASUKKAN API KEY KAMU")
         
-        # Logika Input & Tombol
         if not st.session_state.api_active:
             new_key = st.text_input("Enter Gemini API Key:", type="password", placeholder="Paste your API Key here...")
             if st.button("💾 Save API Key"):
@@ -59,7 +78,6 @@ with st.container():
                 st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
-# Hubungkan ke Google AI jika key aktif
 if st.session_state.api_active:
     genai.configure(api_key=st.session_state.api_key_saved)
 
@@ -89,9 +107,10 @@ with st.sidebar:
 
 # --- 6. MULTI-VIDEO UPLOADER & PREVIEW ---
 st.markdown("### 🎬 1. Upload Reference Videos")
-uploaded_files = st.file_uploader("Upload Video Refrensi", type=["mp4", "mov", "avi"], accept_multiple_files=True)
+uploaded_files = st.file_uploader("Upload Video Referensi", type=["mp4", "mov", "avi"], accept_multiple_files=True)
 
 if uploaded_files:
+    # Menggunakan container untuk preview yang lebih fleksibel
     cols = st.columns(3)
     for idx, file in enumerate(uploaded_files):
         with cols[idx % 3]:
@@ -116,12 +135,10 @@ if uploaded_files:
                         time.sleep(2)
                         video_file = genai.get_file(video_file.name)
 
-                    # Analisa Gerakan
                     instruction = "Analyze dance choreography. Extract ONLY skeletal movement in 1-second intervals for 20s. Separate Part 1 (0-10s) and Part 2 (10-20s) with '---SEPARATOR---'."
                     response = model.generate_content([video_file, instruction])
                     raw_motion = response.text
 
-                    # Prompt Builder
                     tex_mantra = "8k, raw photo, subsurface scattering, visible pores. " if realism_level == "Hyper-Real (Pores & Sweat)" else "Realistic human skin. "
                     soul_str = ", ".join(mannerisms)
                     
@@ -159,10 +176,14 @@ if st.session_state.all_prompts:
     for idx, item in enumerate(st.session_state.all_prompts):
         with st.container():
             st.markdown(f'<div class="result-card"><h4>🎥 Video Reference: {item["name"]}</h4></div>', unsafe_allow_html=True)
+            
+            # Kolom hasil akan tumpuk otomatis di HP berkat CSS di atas
             col_res1, col_res2 = st.columns([1, 2])
             with col_res1:
                 st.video(item['video'])
             with col_res2:
                 t1, t2 = st.tabs(["📌 Prompt 1 (0-10s)", "📌 Prompt 2 (10-20s)"])
-                with t1: st.code(item['p1'], language="text")
-                with t2: st.code(item['p2'], language="text")
+                with t1: 
+                    st.code(item['p1'], language="text")
+                with t2: 
+                    st.code(item['p2'], language="text")

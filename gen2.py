@@ -4,7 +4,6 @@ import yt_dlp
 import time
 import os
 import re
-import base64
 
 # --- 1. KONFIGURASI HALAMAN ---
 st.set_page_config(page_title="GROK APEX ARCHITECT", page_icon="⚡", layout="wide")
@@ -27,33 +26,42 @@ if 'api_active' not in st.session_state: st.session_state.api_active = False
 if 'auto_dance_name' not in st.session_state: st.session_state.auto_dance_name = ""
 if 'prepared_video' not in st.session_state: st.session_state.prepared_video = None
 
-# --- 4. ENGINE: TRANSCODE VIDEO (FIX GAMBAR & SUARA) ---
+# --- 4. ENGINE: TRANSCODE ALA TELEGRAM (H.264 + AAC) ---
 def sync_and_transcode(url):
     if not os.path.exists('downloads'): os.makedirs('downloads')
     
-    # Opsi yt-dlp untuk memaksa format H.264 (Paling Kompatibel)
+    # Settingan ini akan memaksa Video TikTok (HEVC) menjadi MP4 standar (AVC/H.264)
+    # Persis seperti cara kerja pengiriman video di Telegram
     ydl_opts = {
-        'format': 'bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-        'outtmpl': 'downloads/%(id)s.%(ext)s',
+        'format': 'bestvideo+bestaudio/best',
+        'outtmpl': 'downloads/%(id)s_fixed.%(ext)s',
+        'merge_output_format': 'mp4',
         'quiet': True,
         'noplaylist': True,
-        'merge_output_format': 'mp4',
         'postprocessors': [{
             'key': 'FFmpegVideoConvertor',
             'preferedformat': 'mp4',
         }],
+        'postprocessor_args': [
+            '-c:v', 'libx264',    # Codec Video Standar Telegram (H.264)
+            '-preset', 'veryfast',
+            '-crf', '23',          # Menjaga kualitas tetap tajam
+            '-pix_fmt', 'yuv420p', # Format warna agar muncul di Chrome/Android
+            '-c:a', 'aac',        # Codec Audio Standar Telegram
+        ],
     }
     
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
-        # Ambil path file hasil download
         video_path = ydl.prepare_filename(info)
         
-        # Deteksi Musik dari Metadata
-        detected_name = info.get('track') or info.get('title') or "Unknown Trend"
+        # Perbaikan ekstensi jika berubah
+        if not os.path.exists(video_path):
+            video_path = video_path.rsplit('.', 1)[0] + '.mp4'
+        
+        detected_name = info.get('track') or info.get('title') or "Trend"
         detected_name = re.sub(r'[^\w\s]', '', detected_name).split('\n')[0]
         
-        # Baca sebagai bytes untuk tombol download
         with open(video_path, 'rb') as f:
             v_bytes = f.read()
             
@@ -81,22 +89,21 @@ with st.sidebar:
     dance_name_input = st.text_input("🎵 Trend Name:", value=st.session_state.auto_dance_name)
     visual_preset = st.selectbox("✨ Style:", ["Hyper-Realistic", "Cinematic", "TikTok Style"])
     cam_move = st.selectbox("📸 Camera:", ["Static", "Slow Zoom", "Handheld Shake"])
-    shot_type = st.selectbox("📐 Shot:", ["Full Body", "Medium Shot", "Close-up"])
     bahasa = st.radio("🌐 Language:", ("English", "Bahasa Indonesia"))
 
 # --- 7. SOURCE SECTION ---
 st.markdown("### 🎬 1. MOTION SOURCE")
 
-# Step 1: Music Sync & Download
+# Step 1: Music Sync & Transcode Tool
 with st.container():
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    st.markdown("#### 🔗 Step 1: Sync Music & Download (Fix Image/Sound)")
+    st.markdown("#### 🔗 Step 1: Sync Music & Fix Codec")
     url_input = st.text_input("Paste Link TikTok/YouTube:", placeholder="https://...")
     
     col_sync, col_dl = st.columns(2)
-    if col_sync.button("🔄 SYNC & TRANSCODE"):
+    if col_sync.button("🔄 SYNC & FIX VIDEO"):
         if url_input:
-            with st.spinner("Processing Video Codec (FFmpeg)..."):
+            with st.spinner("Converting to Telegram-Style MP4 (Please Wait)..."):
                 try:
                     v_bytes, v_name, f_name = sync_and_transcode(url_input)
                     st.session_state.auto_dance_name = v_name
@@ -106,20 +113,24 @@ with st.container():
 
     if st.session_state.prepared_video:
         with col_dl:
-            st.download_button("📥 DOWNLOAD COMPATIBLE VIDEO", data=st.session_state.prepared_video["bytes"], file_name=st.session_state.prepared_video["filename"], mime="video/mp4")
-        st.success(f"Music: {st.session_state.auto_dance_name}. Video sudah diperbaiki kodenya. Download lalu upload di Step 2.")
+            st.download_button(
+                label="📥 DOWNLOAD COMPATIBLE MP4", 
+                data=st.session_state.prepared_video["bytes"], 
+                file_name=st.session_state.prepared_video["filename"], 
+                mime="video/mp4"
+            )
+        st.success(f"Musik: {st.session_state.auto_dance_name}. Video sudah diperbaiki. Download lalu upload di Step 2.")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # Step 2: Upload & Analysis
 with st.container():
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
     st.markdown("#### 📤 Step 2: Upload Video for Analysis")
-    up_files = st.file_uploader("Upload video hasil download (Batch)", type=["mp4", "mov"], accept_multiple_files=True)
+    up_files = st.file_uploader("Upload video yang sudah didownload (MP4)", type=["mp4", "mov"], accept_multiple_files=True)
     if up_files:
         cols = st.columns(min(len(up_files), 3))
         for idx, f in enumerate(up_files):
             with cols[idx % 3]:
-                # Gunakan st.video standar karena video sudah di-transcode oleh aplikasi
                 st.video(f)
                 st.caption(f"📄 {f.name}")
     st.markdown('</div>', unsafe_allow_html=True)
@@ -134,19 +145,20 @@ if st.button("🔥 EXECUTE ANALYSIS"):
         model = genai.GenerativeModel(model_name="gemini-2.5-flash")
 
         for f in up_files:
-            with st.status(f"Analysing {f.name}...") as status:
+            v_name = f.name
+            with st.status(f"Analysing {v_name}...") as status:
                 try:
                     f_bytes = f.read()
-                    temp_p = f"temp_{f.name}"
+                    temp_p = f"temp_{v_name}"
                     with open(temp_p, "wb") as temp_f: temp_f.write(f_bytes)
                     video_file = genai.upload_file(path=temp_p)
                     while video_file.state.name == "PROCESSING": time.sleep(2); video_file = genai.get_file(video_file.name)
-                    res = model.generate_content([video_file, f"Analyze dance for '{dance_name_input}'. 1s skeletal breakdown. Split Part 1/2 with '---SEPARATOR---'."])
+                    res = model.generate_content([video_file, f"Analyze dance choreography for '{dance_name_input}'. 1s skeletal breakdown. Separate Part 1/2 with '---SEPARATOR---'."])
                     
                     p1_m = res.text.split('---SEPARATOR---')[0].strip() if '---SEPARATOR---' in res.text else res.text
                     p2_m = res.text.split('---SEPARATOR---')[1].strip() if '---SEPARATOR---' in res.text else "fluid continuation"
                     
-                    p1 = f"A cinematic 10s video. [SUBJEK] Woman in image dance '{dance_name_input}'. [CAMERA] {cam_move} {shot_type}. [MOTION] {p1_m} [STYLE] {visual_preset}. [VISUAL LOCK] Strictly maintain outfit. [TECHNICAL] 24fps, coherent."
+                    p1 = f"A cinematic 10s video. [SUBJEK] Woman in image dance '{dance_name_input}'. [CAMERA] {cam_move}. [MOTION] {p1_m} [STYLE] {visual_preset}. [VISUAL LOCK] Strictly maintain outfit. [TECHNICAL] 24fps, coherent."
                     p2 = f"Continue 10s seamlessly. [LANJUTAN] {p2_m}. [CONSISTENCY] Match image exactly."
 
                     st.session_state.all_prompts.append({"name": f.name, "p1": p1, "p2": p2, "video": f_bytes})
@@ -163,6 +175,6 @@ if st.session_state.all_prompts:
         c_r1, c_r2 = st.columns([1, 2])
         with c_r1: st.video(item['video'])
         with c_r2:
-            t1, t2 = st.tabs(["📌 P1 (0-10s)", "📌 P2 (10-20s)"])
-            t1.code(item['p1']); t2.code(item['p2'])
+            t1, t2 = st.tabs(["📌 P1", "📌 P2"])
+            t1.code(item['p1'], language="text"); t2.code(item['p2'], language="text")
         st.markdown('</div>', unsafe_allow_html=True)

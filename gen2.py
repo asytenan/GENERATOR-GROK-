@@ -24,31 +24,40 @@ if 'all_prompts' not in st.session_state: st.session_state.all_prompts = []
 if 'api_key_saved' not in st.session_state: st.session_state.api_key_saved = "" 
 if 'api_active' not in st.session_state: st.session_state.api_active = False
 if 'auto_dance_name' not in st.session_state: st.session_state.auto_dance_name = ""
-if 'video_to_preview' not in st.session_state: st.session_state.video_to_preview = None
+if 'video_bytes' not in st.session_state: st.session_state.video_bytes = None
 
-# --- 4. DOWNLOADER ENGINE (FORCING H.264 FOR BROWSERS) ---
+# --- 4. DOWNLOADER ENGINE (POWERED BY FFMEG) ---
 def download_engine(url):
     if not os.path.exists('downloads'): os.makedirs('downloads')
     
-    # Opsi yt-dlp: PAKSA download format MP4 dengan Codec H.264 agar muncul gambarnya di browser
+    # Opsi yt-dlp untuk MEMAKSA konversi ke format yang bisa diputar browser
     ydl_opts = {
-        'format': 'best[ext=mp4]/best', # Mencari MP4 yang sudah jadi (paling kompatibel)
+        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         'outtmpl': 'downloads/%(id)s.%(ext)s',
         'quiet': True,
         'no_warnings': True,
+        # Menggunakan ffmpeg (dari packages.txt) untuk meremux video agar kompatibel
+        'merge_output_format': 'mp4',
+        'postprocessors': [{
+            'key': 'FFmpegVideoConvertor',
+            'preferedformat': 'mp4',
+        }],
     }
     
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         video_path = ydl.prepare_filename(info)
-        raw_name = info.get('track') or info.get('title') or "Unknown_Trend"
+        # Jika yt-dlp merubah ekstensi, kita ambil path yang benar
+        if not os.path.exists(video_path):
+            video_path = video_path.rsplit('.', 1)[0] + '.mp4'
+            
+        raw_name = info.get('track') or info.get('title') or "Trend"
         clean_name = re.sub(r'[^\w\s]', '', raw_name).split('\n')[0]
         
-        # Baca file menjadi bytes agar Streamlit bisa menyajikannya tanpa masalah path
         with open(video_path, 'rb') as f:
-            v_bytes = f.read()
+            v_data = f.read()
             
-        return v_bytes, clean_name, video_path
+        return v_data, clean_name, video_path
 
 # --- 5. TOP SECTION ---
 st.markdown('<p class="main-header">GROK APEX ARCHITECT</p>', unsafe_allow_html=True)
@@ -56,7 +65,7 @@ st.markdown('<p class="main-header">GROK APEX ARCHITECT</p>', unsafe_allow_html=
 with st.container():
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
     if not st.session_state.api_active:
-        key_input = st.text_input("🛡️ ENTER SYSTEM ACCESS KEY", type="password")
+        key_input = st.text_input("🛡️ SYSTEM ACCESS KEY", type="password")
         if st.button("INITIALIZE CORE SYSTEM"):
             if key_input.startswith("AIza"):
                 st.session_state.api_key_saved = key_input; st.session_state.api_active = True; st.rerun()
@@ -64,8 +73,7 @@ with st.container():
     else:
         c1, c2 = st.columns([4, 1])
         c1.success("✅ SYSTEM ONLINE")
-        if c2.button("LOGOUT"): 
-            st.session_state.api_active = False; st.session_state.api_key_saved = ""; st.rerun()
+        if c2.button("LOGOUT"): st.session_state.api_active = False; st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
 # --- 6. SIDEBAR ---
@@ -73,13 +81,10 @@ with st.sidebar:
     st.markdown("## MASTER CONTROL")
     with st.expander("🎵 DANCE CONTEXT", expanded=True):
         dance_name_input = st.text_input("Trend Name:", value=st.session_state.auto_dance_name)
-        visual_preset = st.selectbox("Style Preset:", ["Hyper-Realistic", "90s VHS", "Cyberpunk Neon", "Anime Style", "Cinematic Film"])
-        energy = st.select_slider("Energy:", options=["Gentle", "Smooth", "Explosive"])
-    with st.expander("📸 OPTICS & PHYSICS", expanded=True):
-        cam_gear = st.selectbox("Camera:", ["Sony A7R IV", "Arri Alexa", "iPhone 15 Pro Max"])
-        cam_move = st.selectbox("Movement:", ["slow pan right", "gentle dolly forward", "subtle tracking"])
-        shot_type = st.selectbox("Shot Type:", ["Full Body Wide", "Medium Shot", "Close-up"])
-        wind = st.select_slider("Wind Power:", options=["Soft Breeze", "Gentle Wind", "Strong"])
+        visual_preset = st.selectbox("Style Preset:", ["Hyper-Realistic", "90s VHS", "Cyberpunk", "Cinematic"])
+    with st.expander("📸 OPTICS", expanded=True):
+        cam_gear = st.selectbox("Camera:", ["Sony A7R IV", "Arri Alexa", "iPhone 15 Pro"])
+        cam_move = st.selectbox("Movement:", ["slow pan right", "gentle dolly forward", "static handheld"])
     bahasa = st.radio("Language:", ("English", "Bahasa Indonesia"))
 
 # --- 7. SOURCE SECTION ---
@@ -88,34 +93,35 @@ tab_url, tab_file = st.tabs(["🌐 DOWNLOAD LINK", "📤 BATCH UPLOAD"])
 
 with tab_url:
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    url_input = st.text_input("Paste TikTok / YouTube URL:", placeholder="https://...")
+    url_input = st.text_input("Paste Link (TikTok/YT):", placeholder="https://...")
     if st.button("SYNC & DOWNLOAD MOTION"):
         if url_input and st.session_state.api_active:
-            with st.spinner("Forcing H.264 Codec & Downloading..."):
+            with st.spinner("Processing with FFmpeg (Please wait)..."):
                 try:
                     v_bytes, v_name, v_path = download_engine(url_input)
-                    st.session_state.video_to_preview = v_bytes
+                    st.session_state.video_bytes = v_bytes
                     st.session_state.auto_dance_name = v_name
                     st.session_state.last_path = v_path
                     st.rerun()
                 except Exception as e: st.error(f"Error: {e}")
     
-    if st.session_state.video_to_preview:
-        st.video(st.session_state.video_to_preview) # Menampilkan video dari bytes yang sudah kompatibel
+    if st.session_state.video_bytes:
+        # Penanganan khusus agar video terputar dengan lancar
+        st.video(st.session_state.video_bytes, format="video/mp4")
         if st.button("🗑️ CLEAR"):
-            st.session_state.video_to_preview = None; st.session_state.auto_dance_name = ""; st.rerun()
+            st.session_state.video_bytes = None; st.session_state.auto_dance_name = ""; st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
 with tab_file:
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    up_files = st.file_uploader("Upload MP4 Files", type=["mp4", "mov", "avi"], accept_multiple_files=True)
+    up_files = st.file_uploader("Upload Files", type=["mp4", "mov", "avi"], accept_multiple_files=True)
     if up_files:
         st.session_state.manual_videos = up_files
         for f in up_files: st.video(f)
     st.markdown('</div>', unsafe_allow_html=True)
 
 # --- 8. EXECUTION ---
-if st.button("🔥 EXECUTE MOTION ANALYSIS"):
+if st.button("🔥 EXECUTE ANALYSIS"):
     if not st.session_state.api_active: st.error("API Key Required!")
     else:
         st.session_state.all_prompts = []
@@ -123,8 +129,8 @@ if st.button("🔥 EXECUTE MOTION ANALYSIS"):
         model = genai.GenerativeModel(model_name="gemini-2.5-flash")
         
         queue = []
-        if st.session_state.video_to_preview: 
-            queue.append(('link', st.session_state.last_path, st.session_state.video_to_preview, st.session_state.auto_dance_name))
+        if st.session_state.video_bytes: 
+            queue.append(('link', st.session_state.last_path, st.session_state.video_bytes, st.session_state.auto_dance_name))
         if up_files:
             for f in up_files: queue.append(('manual', f, f.read(), f.name))
 
@@ -138,13 +144,13 @@ if st.button("🔥 EXECUTE MOTION ANALYSIS"):
                         video_file = genai.upload_file(path=tmp_p)
 
                     while video_file.state.name == "PROCESSING": time.sleep(2); video_file = genai.get_file(video_file.name)
-                    res = model.generate_content([video_file, f"Analyze dance for '{dance_name_input}'. 1s skeletal breakdown. Split Part 1/2 with '---SEPARATOR---'."])
-                    raw_m = res.text
-                    p1_m = raw_m.split('---SEPARATOR---')[0].strip() if '---SEPARATOR---' in raw_m else raw_m
-                    p2_m = raw_m.split('---SEPARATOR---')[1].strip() if '---SEPARATOR---' in raw_m else "fluid sequences"
+                    res = model.generate_content([video_file, f"Analyze dance choreography for '{dance_name_input}'. 1s skeletal breakdown. Separate Part 1/2 with '---SEPARATOR---'."])
                     
-                    p1 = f"A cinematic 10s video. [SUBJEK] Woman in image dance '{dance_name_input}'. [CAMERA] {cam_move} {shot_type}. [MOTION] {p1_m} [STYLE] {visual_preset}, {wind} wind. [VISUAL LOCK] Strictly maintain outfit. [TECHNICAL] 24fps, coherent."
-                    p2 = f"Continue 10s seamlessly. [LANJUTAN] {p2_m}. [CONTROL] {energy.lower()} pacing. [CONSISTENCY] Match image exactly."
+                    p1_m = res.text.split('---SEPARATOR---')[0].strip() if '---SEPARATOR---' in res.text else res.text
+                    p2_m = res.text.split('---SEPARATOR---')[1].strip() if '---SEPARATOR---' in res.text else "fluid continuation"
+                    
+                    p1 = f"A cinematic 10s video. [SUBJEK] Woman in image dance '{dance_name_input}'. [CAMERA] {cam_move}. [MOTION] {p1_m} [STYLE] {visual_preset}. [VISUAL LOCK] Strictly maintain outfit. [TECHNICAL] 24fps, coherent."
+                    p2 = f"Continue 10s seamlessly. [LANJUTAN] {p2_m}. [CONTROL] smooth pacing. [CONSISTENCY] Match image exactly."
                     
                     st.session_state.all_prompts.append({"name": v_name, "p1": p1, "p2": p2, "video": v_content})
                     if v_type == 'manual': os.remove(tmp_p)
@@ -158,8 +164,8 @@ if st.session_state.all_prompts:
         st.markdown(f'<div class="glass-card">', unsafe_allow_html=True)
         st.subheader(f"🎥 {item['name']}")
         c_res1, c_res2 = st.columns([1, 2])
-        with c_res1: st.video(item['video'])
+        with c_res1: st.video(item['video'], format="video/mp4")
         with c_res2:
-            tab1, tab2 = st.tabs(["📌 PROMPT 1", "📌 PROMPT 2"])
-            tab1.code(item['p1'], language="text"); tab2.code(item['p2'], language="text")
+            t1, t2 = st.tabs(["📌 PROMPT 1", "📌 PROMPT 2"])
+            t1.code(item['p1'], language="text"); t2.code(item['p2'], language="text")
         st.markdown('</div>', unsafe_allow_html=True)

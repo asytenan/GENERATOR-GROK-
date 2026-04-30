@@ -4,88 +4,59 @@ import yt_dlp
 import time
 import os
 import re
-import base64
 
 # --- 1. KONFIGURASI HALAMAN ---
-st.set_page_config(
-    page_title="GROK APEX ARCHITECT", 
-    page_icon="⚡", 
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="GROK APEX ARCHITECT", page_icon="⚡", layout="wide")
 
 # --- 2. FUTURISTIC CSS ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&family=Inter:wght@300;400;700&display=swap');
     html, body, [data-testid="stAppViewContainer"] { background-color: #050505; font-family: 'Inter', sans-serif; }
-    .main-header {
-        font-family: 'Orbitron', sans-serif;
-        font-size: clamp(1.5rem, 5vw, 2.8rem);
-        font-weight: 900;
-        background: linear-gradient(90deg, #FFD700, #FF4B4B);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        text-align: center;
-        margin-bottom: 20px;
-    }
-    .glass-card {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(10px);
-        border-radius: 20px;
-        padding: 20px;
-        margin-bottom: 20px;
-    }
-    .stButton>button {
-        width: 100%; border-radius: 12px; font-weight: 700;
-        background: linear-gradient(45deg, #FF4B4B, #800000);
-        color: white; border: none; height: 3.5em;
-    }
-    #MainMenu, footer, header {visibility: hidden;}
+    .main-header { font-family: 'Orbitron', sans-serif; font-size: clamp(1.5rem, 5vw, 2.8rem); font-weight: 900; background: linear-gradient(90deg, #FFD700, #FF4B4B); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; margin-bottom: 20px; }
+    .glass-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border-radius: 20px; padding: 20px; margin-bottom: 20px; }
+    .stButton>button { width: 100%; border-radius: 12px; font-weight: 700; background: linear-gradient(45deg, #FF4B4B, #800000); color: white; border: none; height: 3.5em; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. INISIALISASI SESSION STATE ---
+# --- 3. SESSION STATE ---
 if 'all_prompts' not in st.session_state: st.session_state.all_prompts = [] 
 if 'api_key_saved' not in st.session_state: st.session_state.api_key_saved = "" 
 if 'api_active' not in st.session_state: st.session_state.api_active = False
 if 'auto_dance_name' not in st.session_state: st.session_state.auto_dance_name = ""
-if 'dl_video_base64' not in st.session_state: st.session_state.dl_video_base64 = None
-if 'manual_videos_data' not in st.session_state: st.session_state.manual_videos_data = []
+if 'video_to_preview' not in st.session_state: st.session_state.video_to_preview = None
 
-# --- 4. HELPER: CONVERT VIDEO TO BASE64 ---
-def get_video_base64(file_path):
-    with open(file_path, "rb") as f:
-        data = f.read()
-        return base64.b64encode(data).decode()
-
-# --- 5. DOWNLOADER ENGINE ---
+# --- 4. DOWNLOADER ENGINE (FORCING H.264 FOR BROWSERS) ---
 def download_engine(url):
     if not os.path.exists('downloads'): os.makedirs('downloads')
+    
+    # Opsi yt-dlp: PAKSA download format MP4 dengan Codec H.264 agar muncul gambarnya di browser
     ydl_opts = {
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-        'outtmpl': 'downloads/%(title)s.%(ext)s',
-        'quiet': True, 'no_warnings': True,
+        'format': 'best[ext=mp4]/best', # Mencari MP4 yang sudah jadi (paling kompatibel)
+        'outtmpl': 'downloads/%(id)s.%(ext)s',
+        'quiet': True,
+        'no_warnings': True,
     }
+    
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         video_path = ydl.prepare_filename(info)
         raw_name = info.get('track') or info.get('title') or "Unknown_Trend"
         clean_name = re.sub(r'[^\w\s]', '', raw_name).split('\n')[0]
         
-        # Convert ke Base64 untuk preview yang stabil
-        v_base64 = get_video_base64(video_path)
+        # Baca file menjadi bytes agar Streamlit bisa menyajikannya tanpa masalah path
+        with open(video_path, 'rb') as f:
+            v_bytes = f.read()
             
-        return v_base64, clean_name, video_path
+        return v_bytes, clean_name, video_path
 
-# --- 6. TOP SECTION: API KEY ---
+# --- 5. TOP SECTION ---
 st.markdown('<p class="main-header">GROK APEX ARCHITECT</p>', unsafe_allow_html=True)
 
 with st.container():
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
     if not st.session_state.api_active:
-        key_input = st.text_input("🛡️ SYSTEM ACCESS KEY", type="password")
+        key_input = st.text_input("🛡️ ENTER SYSTEM ACCESS KEY", type="password")
         if st.button("INITIALIZE CORE SYSTEM"):
             if key_input.startswith("AIza"):
                 st.session_state.api_key_saved = key_input; st.session_state.api_active = True; st.rerun()
@@ -97,27 +68,21 @@ with st.container():
             st.session_state.api_active = False; st.session_state.api_key_saved = ""; st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- 7. SIDEBAR: MASTER CONTROLS ---
+# --- 6. SIDEBAR ---
 with st.sidebar:
-    st.markdown("<h2 style='color:#FFD700; font-family:Orbitron; font-size:1.1rem;'>MASTER CONTROL</h2>", unsafe_allow_html=True)
-    
+    st.markdown("## MASTER CONTROL")
     with st.expander("🎵 DANCE CONTEXT", expanded=True):
         dance_name_input = st.text_input("Trend Name:", value=st.session_state.auto_dance_name)
-        visual_preset = st.selectbox("Style Preset:", ["Hyper-Realistic", "90s VHS", "Cyberpunk Neon", "Cinematic Film"])
+        visual_preset = st.selectbox("Style Preset:", ["Hyper-Realistic", "90s VHS", "Cyberpunk Neon", "Anime Style", "Cinematic Film"])
         energy = st.select_slider("Energy:", options=["Gentle", "Smooth", "Explosive"])
-
     with st.expander("📸 OPTICS & PHYSICS", expanded=True):
         cam_gear = st.selectbox("Camera:", ["Sony A7R IV", "Arri Alexa", "iPhone 15 Pro Max"])
         cam_move = st.selectbox("Movement:", ["slow pan right", "gentle dolly forward", "subtle tracking"])
         shot_type = st.selectbox("Shot Type:", ["Full Body Wide", "Medium Shot", "Close-up"])
         wind = st.select_slider("Wind Power:", options=["Soft Breeze", "Gentle Wind", "Strong"])
+    bahasa = st.radio("Language:", ("English", "Bahasa Indonesia"))
 
-    with st.expander("🧬 REALISME & SOUL", expanded=False):
-        char_desc = st.text_area("Detail Model:", placeholder="Contoh: Rambut sebahu, baju maroon...", height=80)
-        face_expr = st.selectbox("Ekspresi:", ["Warm smile", "Playful wink", "Confident smirk", "Joyful laugh"])
-        realism = st.select_slider("Texture:", options=["Standard", "Detailed", "Hyper-Real"])
-
-# --- 8. SOURCE SECTION ---
+# --- 7. SOURCE SECTION ---
 st.markdown("### 🎬 1. MOTION SOURCE")
 tab_url, tab_file = st.tabs(["🌐 DOWNLOAD LINK", "📤 BATCH UPLOAD"])
 
@@ -126,100 +91,75 @@ with tab_url:
     url_input = st.text_input("Paste TikTok / YouTube URL:", placeholder="https://...")
     if st.button("SYNC & DOWNLOAD MOTION"):
         if url_input and st.session_state.api_active:
-            with st.spinner("Downloading & Syncing..."):
+            with st.spinner("Forcing H.264 Codec & Downloading..."):
                 try:
-                    v_b64, v_name, v_path = download_engine(url_input)
-                    st.session_state.dl_video_base64 = v_b64
+                    v_bytes, v_name, v_path = download_engine(url_input)
+                    st.session_state.video_to_preview = v_bytes
                     st.session_state.auto_dance_name = v_name
-                    st.session_state.last_dl_path = v_path # Untuk Gemini
+                    st.session_state.last_path = v_path
                     st.rerun()
-                except Exception as e: st.error(f"Download Error: {e}")
+                except Exception as e: st.error(f"Error: {e}")
     
-    if st.session_state.dl_video_base64:
-        # Menampilkan Video via Base64 (Cara paling sakti)
-        st.video(f"data:video/mp4;base64,{st.session_state.dl_video_base64}")
-        if st.button("🗑️ CLEAR DOWNLOAD"):
-            st.session_state.dl_video_base64 = None; st.session_state.auto_dance_name = ""; st.rerun()
+    if st.session_state.video_to_preview:
+        st.video(st.session_state.video_to_preview) # Menampilkan video dari bytes yang sudah kompatibel
+        if st.button("🗑️ CLEAR"):
+            st.session_state.video_to_preview = None; st.session_state.auto_dance_name = ""; st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
 with tab_file:
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
     up_files = st.file_uploader("Upload MP4 Files", type=["mp4", "mov", "avi"], accept_multiple_files=True)
     if up_files:
-        st.session_state.manual_videos_data = up_files
-        f_cols = st.columns(3)
-        for idx, f in enumerate(up_files): f_cols[idx%3].video(f)
+        st.session_state.manual_videos = up_files
+        for f in up_files: st.video(f)
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- 9. EXECUTION ---
-if st.button("🔥 EXECUTE ANALYSIS"):
+# --- 8. EXECUTION ---
+if st.button("🔥 EXECUTE MOTION ANALYSIS"):
     if not st.session_state.api_active: st.error("API Key Required!")
     else:
         st.session_state.all_prompts = []
         genai.configure(api_key=st.session_state.api_key_saved)
         model = genai.GenerativeModel(model_name="gemini-2.5-flash")
-
-        queue = []
-        if st.session_state.dl_video_base64: 
-            queue.append(('link', st.session_state.last_dl_path, st.session_state.dl_video_base64, st.session_state.auto_dance_name))
         
-        if st.session_state.manual_videos_data:
-            for f in st.session_state.manual_videos_data:
-                # Convert manual upload ke base64 untuk konsistensi preview
-                f_bytes = f.read()
-                f_b64 = base64.b64encode(f_bytes).decode()
-                queue.append(('manual', f, f_b64, f.name))
+        queue = []
+        if st.session_state.video_to_preview: 
+            queue.append(('link', st.session_state.last_path, st.session_state.video_to_preview, st.session_state.auto_dance_name))
+        if up_files:
+            for f in up_files: queue.append(('manual', f, f.read(), f.name))
 
-        if not queue: st.warning("No video source detected!")
-        else:
-            for v_type, v_ref, v_b64, v_name in queue:
-                with st.status(f"Analysing {v_name}...") as status:
-                    try:
-                        if v_type == 'link':
-                            video_file = genai.upload_file(path=v_ref)
-                        else:
-                            tmp_p = f"temp_{v_name}"
-                            with open(tmp_p, "wb") as f: f.write(base64.b64decode(v_b64))
-                            video_file = genai.upload_file(path=tmp_p)
+        for v_type, v_ref, v_content, v_name in queue:
+            with st.status(f"Analysing {v_name}...") as status:
+                try:
+                    if v_type == 'link': video_file = genai.upload_file(path=v_ref)
+                    else:
+                        tmp_p = f"temp_{v_name}"
+                        with open(tmp_p, "wb") as f: f.write(v_content)
+                        video_file = genai.upload_file(path=tmp_p)
 
-                        while video_file.state.name == "PROCESSING": time.sleep(2); video_file = genai.get_file(video_file.name)
-                        
-                        res = model.generate_content([video_file, f"Analyze dance for '{dance_name_input}'. 1s skeletal breakdown. Split Part 1/2 with '---SEPARATOR---'."])
-                        raw_m = res.text
+                    while video_file.state.name == "PROCESSING": time.sleep(2); video_file = genai.get_file(video_file.name)
+                    res = model.generate_content([video_file, f"Analyze dance for '{dance_name_input}'. 1s skeletal breakdown. Split Part 1/2 with '---SEPARATOR---'."])
+                    raw_m = res.text
+                    p1_m = raw_m.split('---SEPARATOR---')[0].strip() if '---SEPARATOR---' in raw_m else raw_m
+                    p2_m = raw_m.split('---SEPARATOR---')[1].strip() if '---SEPARATOR---' in raw_m else "fluid sequences"
+                    
+                    p1 = f"A cinematic 10s video. [SUBJEK] Woman in image dance '{dance_name_input}'. [CAMERA] {cam_move} {shot_type}. [MOTION] {p1_m} [STYLE] {visual_preset}, {wind} wind. [VISUAL LOCK] Strictly maintain outfit. [TECHNICAL] 24fps, coherent."
+                    p2 = f"Continue 10s seamlessly. [LANJUTAN] {p2_m}. [CONTROL] {energy.lower()} pacing. [CONSISTENCY] Match image exactly."
+                    
+                    st.session_state.all_prompts.append({"name": v_name, "p1": p1, "p2": p2, "video": v_content})
+                    if v_type == 'manual': os.remove(tmp_p)
+                    status.update(label=f"Done: {v_name}", state="complete")
+                except Exception as e: st.error(f"Error: {e}")
 
-                        p1_m = raw_m.split('---SEPARATOR---')[0].strip() if '---SEPARATOR---' in raw_m else raw_m
-                        p2_m = raw_m.split('---SEPARATOR---')[1].strip() if '---SEPARATOR---' in raw_m else "continuing motion"
-                        
-                        c_lock = f"Model Details: {char_desc}. " if char_desc else ""
-                        
-                        prompt1 = f"A cinematic 10s video. [SUBJEK] Woman in image, {c_lock}dance '{dance_name_input}'. [CAMERA] {cam_move} {shot_type} ({cam_gear}). [MOTION] {p1_m} [STYLE] {visual_preset}, {face_expr}, {wind} wind. [VISUAL LOCK] Strictly maintain outfit. [TECHNICAL] 24fps, coherent."
-                        prompt2 = f"Continue 10s seamlessly. [LANJUTAN] {p2_m}. [CONTROL] {energy.lower()} pacing. [CONSISTENCY] Match image exactly."
-
-                        st.session_state.all_prompts.append({
-                            "name": v_name, "p1": prompt1, "p2": prompt2, "v_b64": v_b64
-                        })
-                        
-                        if v_type == 'manual': os.remove(tmp_p)
-                        status.update(label=f"Done: {v_name}", state="complete")
-                    except Exception as e: st.error(f"Error: {e}")
-
-# --- 10. RESULTS ---
+# --- 9. RESULTS ---
 if st.session_state.all_prompts:
     st.markdown("### 🚀 2. GENERATED PROMPTS")
     for item in st.session_state.all_prompts:
         st.markdown(f'<div class="glass-card">', unsafe_allow_html=True)
         st.subheader(f"🎥 {item['name']}")
-        
-        r_col1, r_col2 = st.columns([1, 2])
-        with r_col1:
-            # Playback dari Base64 di hasil akhir
-            st.video(f"data:video/mp4;base64,{item['v_b64']}")
-            
-        with r_col2:
-            t1, t2 = st.tabs(["📌 PROMPT 1", "📌 PROMPT 2"])
-            t1.code(item['p1'], language="text")
-            t2.code(item['p2'], language="text")
+        c_res1, c_res2 = st.columns([1, 2])
+        with c_res1: st.video(item['video'])
+        with c_res2:
+            tab1, tab2 = st.tabs(["📌 PROMPT 1", "📌 PROMPT 2"])
+            tab1.code(item['p1'], language="text"); tab2.code(item['p2'], language="text")
         st.markdown('</div>', unsafe_allow_html=True)
-    
-    full_t = "\n\n".join([f"FILE: {i['name']}\nP1: {i['p1']}\nP2: {i['p2']}" for i in st.session_state.all_prompts])
-    st.download_button("💾 DOWNLOAD ALL (.TXT)", data=full_t, file_name="Apex_Prompts.txt")

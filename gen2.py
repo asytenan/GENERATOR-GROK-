@@ -4,6 +4,7 @@ import yt_dlp
 import time
 import os
 import re
+import base64
 
 # --- 1. KONFIGURASI HALAMAN ---
 st.set_page_config(page_title="GROK APEX ARCHITECT", page_icon="⚡", layout="wide")
@@ -26,15 +27,14 @@ if 'api_active' not in st.session_state: st.session_state.api_active = False
 if 'auto_dance_name' not in st.session_state: st.session_state.auto_dance_name = ""
 if 'prepared_video' not in st.session_state: st.session_state.prepared_video = None
 
-# --- 4. ENGINE: TRANSCODE ALA TELEGRAM (H.264 + AAC) ---
-def sync_and_transcode(url):
+# --- 4. ENGINE: ULTRA-TRANSCODE (MENGUBAH TOTAL MENJADI FORMAT WEB) ---
+def sync_and_transcode_ultra(url):
     if not os.path.exists('downloads'): os.makedirs('downloads')
     
-    # Settingan ini akan memaksa Video TikTok (HEVC) menjadi MP4 standar (AVC/H.264)
-    # Persis seperti cara kerja pengiriman video di Telegram
+    # Opsi paling agresif untuk memaksa video menjadi H.264 Baseline (Format Web Paling Dasar)
     ydl_opts = {
         'format': 'bestvideo+bestaudio/best',
-        'outtmpl': 'downloads/%(id)s_fixed.%(ext)s',
+        'outtmpl': 'downloads/video_fixed.%(ext)s',
         'merge_output_format': 'mp4',
         'quiet': True,
         'noplaylist': True,
@@ -43,11 +43,13 @@ def sync_and_transcode(url):
             'preferedformat': 'mp4',
         }],
         'postprocessor_args': [
-            '-c:v', 'libx264',    # Codec Video Standar Telegram (H.264)
-            '-preset', 'veryfast',
-            '-crf', '23',          # Menjaga kualitas tetap tajam
-            '-pix_fmt', 'yuv420p', # Format warna agar muncul di Chrome/Android
-            '-c:a', 'aac',        # Codec Audio Standar Telegram
+            '-c:v', 'libx264',        # Codec paling kompatibel
+            '-profile:v', 'baseline', # Profil dasar (Pasti jalan di HP manapun)
+            '-level', '3.0',
+            '-pix_fmt', 'yuv420p',    # Format warna standar web
+            '-movflags', '+faststart',# Agar video bisa langsung diputar saat loading
+            '-c:a', 'aac',            # Audio standar
+            '-b:a', '128k'
         ],
     }
     
@@ -55,8 +57,8 @@ def sync_and_transcode(url):
         info = ydl.extract_info(url, download=True)
         video_path = ydl.prepare_filename(info)
         
-        # Perbaikan ekstensi jika berubah
-        if not os.path.exists(video_path):
+        # Pastikan kita mengambil file MP4
+        if not video_path.endswith('.mp4'):
             video_path = video_path.rsplit('.', 1)[0] + '.mp4'
         
         detected_name = info.get('track') or info.get('title') or "Trend"
@@ -65,7 +67,7 @@ def sync_and_transcode(url):
         with open(video_path, 'rb') as f:
             v_bytes = f.read()
             
-        return v_bytes, detected_name, os.path.basename(video_path)
+        return v_bytes, detected_name, "motion_video_web.mp4"
 
 # --- 5. TOP SECTION ---
 st.markdown('<p class="main-header">GROK APEX ARCHITECT PRO</p>', unsafe_allow_html=True)
@@ -73,7 +75,7 @@ st.markdown('<p class="main-header">GROK APEX ARCHITECT PRO</p>', unsafe_allow_h
 with st.container():
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
     if not st.session_state.api_active:
-        key_input = st.text_input("🛡️ SYSTEM ACCESS KEY", type="password")
+        key_input = st.text_input("🛡️ ENTER SYSTEM ACCESS KEY", type="password")
         if st.button("INITIALIZE CORE SYSTEM"):
             if key_input.startswith("AIza"):
                 st.session_state.api_key_saved = key_input; st.session_state.api_active = True; st.rerun()
@@ -94,55 +96,54 @@ with st.sidebar:
 # --- 7. SOURCE SECTION ---
 st.markdown("### 🎬 1. MOTION SOURCE")
 
-# Step 1: Music Sync & Transcode Tool
+# Step 1: Sync & Transcode
 with st.container():
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    st.markdown("#### 🔗 Step 1: Sync Music & Fix Codec")
+    st.markdown("#### 🔗 Step 1: Sync Music & Fix Codec (Ultra Mode)")
     url_input = st.text_input("Paste Link TikTok/YouTube:", placeholder="https://...")
     
-    col_sync, col_dl = st.columns(2)
-    if col_sync.button("🔄 SYNC & FIX VIDEO"):
+    if st.button("🔄 SYNC & FIX VIDEO CODEC"):
         if url_input:
-            with st.spinner("Converting to Telegram-Style MP4 (Please Wait)..."):
+            with st.spinner("Processing Video with FFmpeg Ultra-Compatibility..."):
                 try:
-                    v_bytes, v_name, f_name = sync_and_transcode(url_input)
+                    v_bytes, v_name, f_name = sync_and_transcode_ultra(url_input)
                     st.session_state.auto_dance_name = v_name
                     st.session_state.prepared_video = {"bytes": v_bytes, "filename": f_name}
                     st.rerun()
                 except Exception as e: st.error(f"Sync Failed: {e}")
 
     if st.session_state.prepared_video:
-        with col_dl:
-            st.download_button(
-                label="📥 DOWNLOAD COMPATIBLE MP4", 
-                data=st.session_state.prepared_video["bytes"], 
-                file_name=st.session_state.prepared_video["filename"], 
-                mime="video/mp4"
-            )
-        st.success(f"Musik: {st.session_state.auto_dance_name}. Video sudah diperbaiki. Download lalu upload di Step 2.")
+        st.download_button(
+            label="📥 DOWNLOAD WEB-READY VIDEO", 
+            data=st.session_state.prepared_video["bytes"], 
+            file_name=st.session_state.prepared_video["filename"], 
+            mime="video/mp4"
+        )
+        st.info(f"Musik: {st.session_state.auto_dance_name}. Video sudah dikonversi ke standar web. Download lalu upload di Step 2.")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # Step 2: Upload & Analysis
 with st.container():
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
     st.markdown("#### 📤 Step 2: Upload Video for Analysis")
-    up_files = st.file_uploader("Upload video yang sudah didownload (MP4)", type=["mp4", "mov"], accept_multiple_files=True)
+    up_files = st.file_uploader("Upload video yang sudah didownload tadi (Batch)", type=["mp4", "mov"], accept_multiple_files=True)
     if up_files:
         cols = st.columns(min(len(up_files), 3))
         for idx, f in enumerate(up_files):
             with cols[idx % 3]:
-                st.video(f)
+                # Memaksa player membungkus data dengan tipe yang benar
+                st.video(f, format="video/mp4")
                 st.caption(f"📄 {f.name}")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # --- 8. EXECUTION ---
 if st.button("🔥 EXECUTE ANALYSIS"):
     if not st.session_state.api_active: st.error("API Key Required!")
-    elif not up_files: st.warning("Upload video first!")
+    elif not up_files: st.warning("Upload video in Step 2 first!")
     else:
         st.session_state.all_prompts = []
         genai.configure(api_key=st.session_state.api_key_saved)
-        model = genai.GenerativeModel(model_name="gemini-2.5-flash")
+        model = genai.GenerativeModel(model_name="gemini-1.5-flash-latest")
 
         for f in up_files:
             v_name = f.name
@@ -153,7 +154,7 @@ if st.button("🔥 EXECUTE ANALYSIS"):
                     with open(temp_p, "wb") as temp_f: temp_f.write(f_bytes)
                     video_file = genai.upload_file(path=temp_p)
                     while video_file.state.name == "PROCESSING": time.sleep(2); video_file = genai.get_file(video_file.name)
-                    res = model.generate_content([video_file, f"Analyze dance choreography for '{dance_name_input}'. 1s skeletal breakdown. Separate Part 1/2 with '---SEPARATOR---'."])
+                    res = model.generate_content([video_file, f"Analyze dance for '{dance_name_input}'. 1s skeletal breakdown. Separate Part 1/2 with '---SEPARATOR---'."])
                     
                     p1_m = res.text.split('---SEPARATOR---')[0].strip() if '---SEPARATOR---' in res.text else res.text
                     p2_m = res.text.split('---SEPARATOR---')[1].strip() if '---SEPARATOR---' in res.text else "fluid continuation"
@@ -163,7 +164,7 @@ if st.button("🔥 EXECUTE ANALYSIS"):
 
                     st.session_state.all_prompts.append({"name": f.name, "p1": p1, "p2": p2, "video": f_bytes})
                     os.remove(temp_p)
-                    status.update(label=f"Done: {f.name}", state="complete")
+                    status.update(label=f"Done: {v_name}", state="complete")
                 except Exception as e: st.error(f"Error: {e}")
 
 # --- 9. RESULTS ---
@@ -173,8 +174,8 @@ if st.session_state.all_prompts:
         st.markdown(f'<div class="glass-card">', unsafe_allow_html=True)
         st.subheader(f"🎥 {item['name']}")
         c_r1, c_r2 = st.columns([1, 2])
-        with c_r1: st.video(item['video'])
+        with c_r1: st.video(item['video'], format="video/mp4")
         with c_r2:
-            t1, t2 = st.tabs(["📌 P1", "📌 P2"])
-            t1.code(item['p1'], language="text"); t2.code(item['p2'], language="text")
+            tab1, tab2 = st.tabs(["📌 P1", "📌 P2"])
+            tab1.code(item['p1'], language="text"); tab2.code(item['p2'], language="text")
         st.markdown('</div>', unsafe_allow_html=True)

@@ -8,7 +8,7 @@ import subprocess
 from datetime import datetime
 
 # ==================== PAGE CONFIG ====================
-st.set_page_config(page_title="GROK APEX V2", page_icon="⚡", layout="wide")
+st.set_page_config(page_title="GROK APEX V3", page_icon="⚡", layout="wide")
 
 # ==================== CUSTOM CSS ====================
 st.markdown("""
@@ -132,7 +132,7 @@ def advanced_download(url: str):
 
 # ==================== HEADER ====================
 st.markdown('<p class="main-header">GROK APEX V2</p>', unsafe_allow_html=True)
-st.markdown('<p style="text-align:center; color:#aaa; margin-top:-8px; font-size:1.05rem;">Image-to-Video Optimized • Per-Video Dance Name • Prompt Choice • API Key Manager</p>', unsafe_allow_html=True)
+st.markdown('<p style="text-align:center; color:#aaa; margin-top:-8px; font-size:1.05rem;">Prompt Choice • API Key Manager • History • Batch Link</p>', unsafe_allow_html=True)
 
 # ==================== API KEY MANAGER ====================
 with st.container():
@@ -170,12 +170,76 @@ with st.container():
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ==================== SIDEBAR ====================
+# ==================== SIDEBAR (MASTER CONTROL) ====================
 with st.sidebar:
     st.markdown("## 🎛️ MASTER CONTROL")
+    
+    # === BASIC ===
     style = st.selectbox("🎨 Visual Style", ["Hyper-Realistic", "Cinematic", "TikTok Viral", "Film Look"])
     camera = st.selectbox("📷 Camera Movement", ["Static", "Slow Zoom In", "Gentle Pan", "Handheld"])
     language = st.radio("🌍 Language", ["English", "Bahasa Indonesia"])
+
+    st.markdown("---")
+    
+    # === HUMAN QUIRKS & MANNERISMS ===
+    st.markdown("### 👤 Human Quirks & Mannerisms")
+    mannerisms = st.multiselect(
+        "Pilih Gerakan Manusiawi:",
+        ["Natural Blinking", "Fixing Hair", "Adjusting Clothes", "Rhythmic Breathing", "Joyful Laugh", "Playful Wink"],
+        default=["Natural Blinking"]
+    )
+
+    st.markdown("---")
+    
+    # === PROFESSIONAL COLOR GRADING ===
+    st.markdown("### 🎨 Professional Color Grading (LUTs)")
+    color_grade = st.selectbox(
+        "Pilih LUT:",
+        ["None", "Kodak Portra 400", "FujiFilm Look", "Teal & Orange", "Cinematic", "Vintage Film"]
+    )
+
+    st.markdown("---")
+    
+    # === LIGHTING STYLE ===
+    st.markdown("### 💡 Lighting Style")
+    lighting = st.selectbox(
+        "Pilih Pencahayaan:",
+        ["Three-Point Lighting", "Rim Lighting", "Dynamic Studio", "Golden Hour", "Neon Cyberpunk", "Moody Atmosphere"]
+    )
+
+    st.markdown("---")
+    
+    # === VFX & PARTICLES ===
+    st.markdown("### ✨ VFX & Particles")
+    vfx = st.selectbox(
+        "Pilih Efek Visual:",
+        ["None", "Cinematic Dust", "Falling Petals", "Golden Sparkles", "Neon Particles", "Light Rays"]
+    )
+
+    st.markdown("---")
+    
+    # === WIND POWER ===
+    st.markdown("### 🌬️ Wind Power (Hair & Fabric Physics)")
+    wind = st.selectbox(
+        "Kekuatan Angin:",
+        ["None", "Soft Breeze", "Gentle Wind", "Windy"]
+    )
+
+    st.markdown("---")
+    
+    # === SHOT SEQUENCING ===
+    st.markdown("### 🎬 Shot Sequencing")
+    multi_angle = st.checkbox("Enable Multi-Angle (Wide → Close-up)", value=False)
+
+    st.markdown("---")
+    
+    # === NEGATIVE PROMPT ===
+    st.markdown("### 🚫 Negative Prompt (Anti-Glitch)")
+    negative_prompt = st.text_area(
+        "Kata yang DILARANG (otomatis ditambahkan):",
+        value="3d render, cartoonish, plastic skin, deformed hands, blurry face, text, watermark, logo",
+        height=60
+    )
 
     st.markdown("---")
     st.markdown("## 📜 LINK HISTORY")
@@ -210,7 +274,7 @@ st.markdown("### 🚀 BATCH INSTANT LINK")
 
 with st.container():
     st.markdown('<div class="instant-box">', unsafe_allow_html=True)
-    st.markdown("**Paste banyak link → Otomatis masuk ke Ready + History**")
+    st.markdown("**Paste banyak link (satu per baris) → Otomatis masuk ke Ready + History**")
 
     links_text = st.text_area("🔗 Paste Links (satu per baris)", height=100, placeholder="https://www.tiktok.com/@user/video/111\nhttps://www.tiktok.com/@user/video/222")
 
@@ -351,10 +415,23 @@ if st.button("🔥 GENERATE OFFICIAL PROMPT", disabled=not st.session_state.api_
                         time.sleep(2)
                         vf = genai.get_file(vf.name)
 
+                    # === BUILD ADVANCED PROMPT ===
+                    quirks = ", ".join(mannerisms) if mannerisms else "natural human movement"
+                    vfx_str = f"{vfx} particles in the air" if vfx != "None" else "clear atmosphere"
+                    wind_str = f"{wind} blowing hair and clothes" if wind != "None" else "still air"
+                    
+                    # Multi-angle
+                    if multi_angle:
+                        shot_p1 = "Wide Shot (Full Body) for the first 7 seconds, then smooth zoom to Medium Shot (Waist Up) for the remaining 3 seconds"
+                        shot_p2 = "Close-up shot focusing on facial expression and upper body movement"
+                    else:
+                        shot_p1 = "Full Body Wide Shot throughout"
+                        shot_p2 = "Full Body Wide Shot throughout"
+
                     analysis_prompt = f"""Analyze this dance video. Trend/Song: {song}.
 Provide detailed 1-second skeletal motion breakdown with:
-- Motion Trajectory (jalur gerakan)
-- Weight Distribution (titik berat)
+- Motion Trajectory (jalur gerakan tangan & kaki)
+- Weight Distribution (perpindahan berat badan)
 Separate Part 1 (0-10s) and Part 2 (10-20s) with '---SEPARATOR---'."""
 
                     response = model.generate_content([vf, analysis_prompt])
@@ -363,36 +440,37 @@ Separate Part 1 (0-10s) and Part 2 (10-20s) with '---SEPARATOR---'."""
                     part1 = raw.split("---SEPARATOR---")[0].strip() if "---SEPARATOR---" in raw else raw
                     part2 = raw.split("---SEPARATOR---")[1].strip() if "---SEPARATOR---" in raw else "continuing smoothly"
 
-                    # PROMPT 1 - Original
+                    # === PROMPT 1 - ORIGINAL ===
                     p1 = f"""Cinematic 10-second video.
 [SUBJECT] Young woman dancing '{song}' in exact same outfit and location from reference.
-[CAMERA] {camera}.
-[MOTION] {part1}
-[STYLE] {style}, realistic film look, natural physics, high detail.
+[CAMERA] {camera}. {shot_p1}.
+[MOTION] {part1}. {quirks}.
+[STYLE] {style}, {lighting}, {color_grade} color grade, {vfx_str}, {wind_str}, realistic film look, natural physics, high detail.
 [VISUAL LOCK] Strictly maintain exact character, clothing, and background.
-[TECHNICAL] 24fps, smooth motion, coherent movement, Temporal Consistency, Latent Space Stabilization."""
+[TECHNICAL] 24fps, smooth motion, coherent movement, Temporal Consistency, Latent Space Stabilization, {negative_prompt}."""
 
-                    # PROMPT 2 - Extend
+                    # === PROMPT 2 - EXTEND ===
                     p2 = f"""Seamless continuation for another 10 seconds.
-[CONTINUATION] {part2}
+[CONTINUATION] {part2}. {quirks}.
+[CAMERA] {camera}. {shot_p2}.
 [CONSISTENCY] Same character, lighting, outfit, and environment.
 [TECHNICAL] 24fps, smooth motion, coherent movement, Temporal Consistency."""
 
-                    # PROMPT 3 - Image-to-Video Optimized (Main)
+                    # === PROMPT 3 - IMAGE-TO-VIDEO OPTIMIZED (MAIN) ===
                     p3 = f"""Cinematic 10-second video of a young woman dancing '{song}' in the exact same outfit and location as the reference image.
 
-Camera: {camera}. Smooth and natural movement with realistic physics and weight distribution. Highly detailed, filmic color grade, natural lighting.
+Camera: {camera}. {shot_p1}. Smooth and natural movement with realistic physics and weight distribution. Highly detailed skin with visible pores and subsurface scattering. Film grain, natural lighting, {color_grade} color grade.
 
-Strict visual consistency with the reference image as the first frame. No morphing.
+Strict visual consistency with the reference image as the first frame. No morphing, no sudden changes.
 
-{part1[:350]}..."""
+{part1[:400]}..."""
 
-                    # PROMPT 4 - Image-to-Video Optimized (Extend)
+                    # === PROMPT 4 - IMAGE-TO-VIDEO OPTIMIZED (EXTEND) ===
                     p4 = f"""Seamless 10-second continuation of the previous clip.
 
-Smooth camera movement, natural physics, weight shift, and coherent motion. Maintain exact same character, lighting, and environment.
+Smooth camera movement, natural physics, weight shift, and coherent motion. Maintain exact same character, lighting, and environment. {color_grade} color grade.
 
-{part2[:300]}..."""
+{part2[:350]}..."""
 
                     st.session_state.all_prompts.append({
                         "name": name,
@@ -452,4 +530,4 @@ if st.session_state.all_prompts:
             st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown("---")
-st.markdown("<p style='text-align:center; color:#666; font-size:0.85rem;'>GROK APEX V2 • Prompt Choice + Image-to-Video Optimized • Powered by Gemini + yt-dlp + FFmpeg</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:#666; font-size:0.85rem;'>GROK APEX V2 • Advanced Master Control + Prompt Choice • Powered by Gemini + yt-dlp + FFmpeg</p>", unsafe_allow_html=True)

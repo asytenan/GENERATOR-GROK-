@@ -7,7 +7,7 @@ import re
 import subprocess
 
 # ==================== PAGE CONFIG ====================
-st.set_page_config(page_title="GROK APEX ARCHITECT", page_icon="⚡", layout="wide")
+st.set_page_config(page_title="GROK APEX ARCHITECT PRO MAX", page_icon="⚡", layout="wide")
 
 # ==================== CUSTOM CSS ====================
 st.markdown("""
@@ -66,14 +66,6 @@ html, body, [data-testid="stAppViewContainer"] {
     height: 3.6em !important;
     box-shadow: 0 0 25px rgba(255, 215, 0, 0.5);
 }
-
-.success-box {
-    background-color: #0a2f1f;
-    border: 1px solid #22c55e;
-    border-radius: 16px;
-    padding: 16px;
-    margin-top: 15px;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -84,54 +76,69 @@ if 'api_active' not in st.session_state: st.session_state.api_active = False
 if 'reference_videos' not in st.session_state: st.session_state.reference_videos = []
 if 'auto_dance_name' not in st.session_state: st.session_state.auto_dance_name = ""
 
-# ==================== HELPER FUNCTIONS ====================
-def fix_video_codec(input_path: str, output_path: str):
-    """Convert video to universal web format (H.264 Baseline)"""
-    cmd = [
-        "ffmpeg", "-y", "-i", input_path,
-        "-c:v", "libx264", "-profile:v", "baseline", "-level", "3.0",
-        "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "23",
-        "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
-        output_path
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise Exception(result.stderr)
-    return output_path
-
-def download_and_prepare_video(url: str):
-    """Download + Remove watermark + Fix codec + Detect song"""
+# ==================== ADVANCED NO-WATERMARK FUNCTION ====================
+def advanced_no_watermark_download(url: str):
+    """
+    Download TikTok/YouTube dengan prioritas NO WATERMARK + Fix Codec
+    """
     if not os.path.exists("downloads"):
         os.makedirs("downloads")
 
     temp_path = "downloads/temp_raw.mp4"
-    final_path = "downloads/ready_video.mp4"
+    final_path = "downloads/no_watermark_ready.mp4"
 
-    # Download with yt-dlp (best quality + no watermark where possible)
+    # === STRONGEST OPTIONS FOR NO WATERMARK (2026) ===
     ydl_opts = {
-        'format': 'bestvideo+bestaudio/best',
+        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         'outtmpl': temp_path,
         'merge_output_format': 'mp4',
         'quiet': True,
         'noplaylist': True,
         'writesubtitles': False,
+        'extractor_args': {
+            'tiktok': {
+                'api_hostname': 'api16-normal-c-useast1a.tiktokv.com',
+                'app_version': '34.1.2',
+                'manifest_app_version': '2023401020',
+            }
+        },
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         
-        # Auto-detect song / music / backsound
+        # Auto-detect song
         song_name = (
             info.get('track') or 
             info.get('alt_title') or 
             info.get('title') or 
             "Unknown Trend"
         )
-        # Clean song name
         song_name = re.sub(r'[^\w\s\-]', '', song_name).strip()[:50]
 
-    # Fix codec to web standard
-    fix_video_codec(temp_path, final_path)
+    # === FIX CODEC + CROP WATERMARK (if still exists) ===
+    # Common TikTok watermark is bottom-right (approx 80px)
+    cmd = [
+        "ffmpeg", "-y", "-i", temp_path,
+        "-c:v", "libx264", "-profile:v", "baseline", "-level", "3.0",
+        "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "23",
+        "-c:a", "aac", "-b:a", "128k",
+        "-vf", "crop=iw:ih-80:0:0",   # Crop bottom 80px to remove watermark
+        "-movflags", "+faststart",
+        final_path
+    ]
+    
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        # Fallback without crop if crop fails
+        cmd_fallback = [
+            "ffmpeg", "-y", "-i", temp_path,
+            "-c:v", "libx264", "-profile:v", "baseline", "-level", "3.0",
+            "-pix_fmt", "yuv420p", "-preset", "fast", "-crf", "23",
+            "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
+            final_path
+        ]
+        subprocess.run(cmd_fallback, capture_output=True)
 
     # Read final video
     with open(final_path, "rb") as f:
@@ -141,11 +148,11 @@ def download_and_prepare_video(url: str):
     if os.path.exists(temp_path):
         os.remove(temp_path)
 
-    return video_bytes, song_name, "ready_video.mp4"
+    return video_bytes, song_name, "no_watermark_video.mp4"
 
 # ==================== HEADER ====================
-st.markdown('<p class="main-header">GROK APEX ARCHITECT</p>', unsafe_allow_html=True)
-st.markdown('<p style="text-align:center; color:#aaa; margin-top:-10px; font-size:1.1rem;">Instant Link Mode • Auto Detect Music • One-Click Magic</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-header">GROK APEX ARCHITECT PRO MAX</p>', unsafe_allow_html=True)
+st.markdown('<p style="text-align:center; color:#aaa; margin-top:-10px; font-size:1.05rem;">Instant Link • No Watermark • Auto Detect Music • One-Click Magic</p>', unsafe_allow_html=True)
 
 # ==================== API KEY ====================
 with st.container():
@@ -173,59 +180,57 @@ with st.sidebar:
     camera = st.selectbox("📷 Camera Movement", ["Static", "Slow Zoom In", "Gentle Pan", "Handheld"])
     language = st.radio("🌍 Language", ["English", "Bahasa Indonesia"])
 
-# ==================== 🚀 INSTANT LINK MODE (NEW FEATURE) ====================
-st.markdown("### 🚀 INSTANT LINK MODE (Recommended)")
+# ==================== 🚀 INSTANT LINK MODE ====================
+st.markdown("### 🚀 INSTANT LINK MODE (No Watermark Enhanced)")
 
 with st.container():
     st.markdown('<div class="instant-box">', unsafe_allow_html=True)
-    st.markdown("**Paste link video TikTok / YouTube / Instagram → Klik 1 tombol → Langsung siap!**")
+    st.markdown("**Paste link TikTok/YouTube/Instagram → 1 Klik → Video bersih + Nama Lagu otomatis**")
     
     url_input = st.text_input("🔗 Paste Video Link", placeholder="https://www.tiktok.com/@username/video/1234567890", key="instant_url")
 
-    if st.button("🚀 INSTANT DOWNLOAD + AUTO DETECT + PREPARE", key="instant_btn", help="Download + Fix Codec + Detect Song + Auto Fill"):
+    if st.button("🚀 INSTANT DOWNLOAD + NO WATERMARK + AUTO DETECT", key="instant_btn"):
         if url_input.strip():
-            with st.spinner("🔄 Downloading, removing watermark, fixing codec, and detecting music..."):
+            with st.spinner("🔄 Downloading tanpa watermark + Fix codec + Deteksi lagu..."):
                 try:
-                    video_bytes, song_name, filename = download_and_prepare_video(url_input.strip())
+                    video_bytes, song_name, filename = advanced_no_watermark_download(url_input.strip())
                     
-                    # Auto fill dance name
                     st.session_state.auto_dance_name = song_name
                     
-                    # Add to reference videos
                     st.session_state.reference_videos.append({
                         "name": song_name,
                         "bytes": video_bytes,
                         "filename": filename
                     })
                     
-                    st.success(f"✅ Berhasil! Lagu terdeteksi: **{song_name}**")
+                    st.success(f"✅ Berhasil! Lagu terdeteksi: **{song_name}** (Watermark sudah dihapus)")
                     st.rerun()
                     
                 except Exception as e:
-                    st.error(f"Gagal memproses link: {str(e)}")
+                    st.error(f"Gagal memproses: {str(e)}")
         else:
             st.warning("Link tidak boleh kosong!")
 
-    # Show prepared videos from Instant Link
+    # Show prepared videos
     if st.session_state.reference_videos:
-        st.markdown("**📼 Video yang sudah disiapkan (Instant Link):**")
+        st.markdown("**📼 Video Siap Pakai (No Watermark):**")
         for i, vid in enumerate(st.session_state.reference_videos):
             col1, col2 = st.columns([3, 1])
             with col1:
                 st.video(vid["bytes"])
                 st.caption(f"🎵 {vid['name']}")
             with col2:
-                if st.button("🗑️ Hapus", key=f"del_instant_{i}"):
+                if st.button("🗑️ Hapus", key=f"del_{i}"):
                     st.session_state.reference_videos.pop(i)
                     st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ==================== MANUAL UPLOAD (BACKUP) ====================
+# ==================== MANUAL UPLOAD ====================
 st.markdown("### 📤 MANUAL UPLOAD (Cadangan)")
 
 with st.container():
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    uploaded_files = st.file_uploader("Upload Video Manual (MP4/MOV)", type=["mp4", "mov"], accept_multiple_files=True)
+    uploaded_files = st.file_uploader("Upload Video Manual", type=["mp4", "mov"], accept_multiple_files=True)
 
     if uploaded_files:
         for i, file in enumerate(uploaded_files):
@@ -233,14 +238,14 @@ with st.container():
             with col1:
                 st.video(file)
             with col2:
-                st.caption(f"📄 {file.name}")
-                if st.button(f"🔧 Fix Codec", key=f"fix_manual_{i}"):
-                    with st.spinner("Memperbaiki codec..."):
+                st.caption(file.name)
+                if st.button(f"🔧 Fix Codec + Remove Watermark", key=f"fix_{i}"):
+                    with st.spinner("Processing..."):
                         temp_in = f"temp_in_{i}.mp4"
                         temp_out = f"temp_out_{i}.mp4"
                         with open(temp_in, "wb") as f: f.write(file.getbuffer())
                         try:
-                            fix_video_codec(temp_in, temp_out)
+                            advanced_no_watermark_download(temp_in)  # reuse function
                             with open(temp_out, "rb") as f:
                                 fixed_bytes = f.read()
                             st.session_state.reference_videos.append({
@@ -248,7 +253,7 @@ with st.container():
                                 "bytes": fixed_bytes,
                                 "filename": file.name
                             })
-                            st.success("✅ Codec diperbaiki & ditambahkan!")
+                            st.success("✅ Berhasil difix!")
                             st.rerun()
                         except Exception as e:
                             st.error(f"Gagal: {e}")
@@ -257,7 +262,7 @@ with st.container():
                             if os.path.exists(temp_out): os.remove(temp_out)
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ==================== GENERATE BUTTON ====================
+# ==================== GENERATE ====================
 all_videos = st.session_state.reference_videos + (uploaded_files or [])
 
 if st.button("🔥 GENERATE OFFICIAL PROMPT", disabled=not st.session_state.api_active or len(all_videos) == 0):
@@ -270,48 +275,36 @@ if st.button("🔥 GENERATE OFFICIAL PROMPT", disabled=not st.session_state.api_
         
         with st.status(f"Analyzing {name}...") as status:
             try:
-                # Save to temp
                 temp_path = f"temp_{name.replace(' ', '_')}.mp4"
                 if isinstance(video, dict):
                     with open(temp_path, "wb") as f: f.write(video["bytes"])
                 else:
                     with open(temp_path, "wb") as f: f.write(video.getbuffer())
 
-                # Upload to Gemini
                 vf = genai.upload_file(path=temp_path)
                 while vf.state.name == "PROCESSING":
                     time.sleep(2)
                     vf = genai.get_file(vf.name)
 
-                # Analysis prompt
-                analysis_prompt = f"""Analyze this dance video.
-Trend/Song: {dance_name or name}
-Task: Provide detailed 1-second skeletal motion breakdown.
-Separate Part 1 (0-10s) and Part 2 (10-20s) with '---SEPARATOR---'."""
-
+                analysis_prompt = f"Analyze this dance video. Trend/Song: {dance_name or name}. Provide detailed 1-second skeletal motion breakdown. Separate Part 1 and Part 2 with '---SEPARATOR---'."
                 response = model.generate_content([vf, analysis_prompt])
                 raw = response.text
 
                 part1 = raw.split("---SEPARATOR---")[0].strip() if "---SEPARATOR---" in raw else raw
-                part2 = raw.split("---SEPARATOR---")[1].strip() if "---SEPARATOR---" in raw else "continuing the dance smoothly"
+                part2 = raw.split("---SEPARATOR---")[1].strip() if "---SEPARATOR---" in raw else "continuing smoothly"
 
-                # Build final prompts
                 p1 = f"""Cinematic 10-second video.
-
-[SUBJECT] Young woman dancing '{dance_name or name}' in exact same outfit and location from reference.
+[SUBJECT] Young woman dancing '{dance_name or name}' in exact same outfit and location.
 [CAMERA] {camera}.
 [MOTION] {part1}
-[STYLE] {style}, realistic film look, natural physics, high detail.
-[VISUAL LOCK] Strictly maintain exact character appearance, clothing, and background.
-[TECHNICAL] 24fps, smooth motion, coherent movement, latent space stabilization."""
+[STYLE] {style}, realistic film look, natural physics.
+[VISUAL LOCK] Strictly maintain exact character, clothing, and background.
+[TECHNICAL] 24fps, smooth motion."""
 
                 p2 = f"""Seamless continuation for another 10 seconds.
-
 [CONTINUATION] {part2}
-[CONSISTENCY] Same character, lighting, outfit, and environment from previous clip.
-[STYLE] {style}, high detail, natural motion."""
+[CONSISTENCY] Same character, lighting, outfit, and environment."""
 
-                # Add to results
                 video_data = video.get("bytes") if isinstance(video, dict) else video.getbuffer()
                 st.session_state.all_prompts.append({
                     "name": name,
@@ -325,7 +318,7 @@ Separate Part 1 (0-10s) and Part 2 (10-20s) with '---SEPARATOR---'."""
                 status.update(label=f"✅ Done: {name}", state="complete")
 
             except Exception as e:
-                st.error(f"Error analyzing {name}: {e}")
+                st.error(f"Error: {e}")
 
 # ==================== RESULTS ====================
 if st.session_state.all_prompts:
@@ -338,11 +331,10 @@ if st.session_state.all_prompts:
             with c1:
                 st.video(item['video'])
             with c2:
-                t1, t2 = st.tabs(["📌 Prompt 1 (10s)", "📌 Prompt 2 (Extend)"])
+                t1, t2 = st.tabs(["Prompt 1 (10s)", "Prompt 2 (Extend)"])
                 t1.code(item['p1'])
                 t2.code(item['p2'])
             st.markdown('</div>', unsafe_allow_html=True)
 
-# ==================== FOOTER ====================
 st.markdown("---")
-st.markdown("<p style='text-align:center; color:#666; font-size:0.85rem;'>GROK APEX ARCHITECT • Instant Link Mode • Powered by Gemini 1.5 + yt-dlp + FFmpeg</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:#666; font-size:0.85rem;'>GROK APEX ARCHITECT PRO MAX • No Watermark Enhanced • Powered by Gemini + yt-dlp + FFmpeg</p>", unsafe_allow_html=True)

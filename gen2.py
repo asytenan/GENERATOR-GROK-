@@ -22,7 +22,7 @@ if 'api_key_saved' not in st.session_state: st.session_state.api_key_saved = ""
 if 'api_active' not in st.session_state: st.session_state.api_active = False
 
 # --- 3. HEADER ---
-st.markdown('<p class="main-header">👑 APLIKASI KESUKAAN DAIGO</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-header">👑 GROK MOTION ARCHITECT</p>', unsafe_allow_html=True)
 st.markdown('<p style="text-align: center; color: #bdc3c7;">Batch Processing with Official Grok AI Prompting Structures</p>', unsafe_allow_html=True)
 
 # --- 4. API KEY MANAGER (FITUR TETAP ADA) ---
@@ -40,7 +40,7 @@ st.divider()
 
 # --- 5. CONTROL PANEL (FITUR EPIC TETAP LENGKAP) ---
 with st.sidebar:
-    st.markdown("## 🎛️ FITUR")
+    st.markdown("## 🎛️ Control Panel")
     
     with st.expander("🎶 Context & Energy", expanded=True):
         dance_name = st.text_input("Nama Tarian/Lagu:", placeholder="Contoh: Tor Monitor Ketua")
@@ -73,7 +73,7 @@ if uploaded_files:
 
     if st.button("🔥 GENERATE OFFICIAL GROK PROMPT", disabled=not st.session_state.api_active):
         st.session_state.all_prompts = [] 
-        model = genai.GenerativeModel(model_name="gemini-flash-latest")
+        model = genai.GenerativeModel(model_name="gemini-2.5-flash")
 
         for i, uploaded_file in enumerate(uploaded_files):
             with st.status(f"Grok-Style Precision Analysis: {uploaded_file.name}...") as status:

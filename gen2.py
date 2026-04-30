@@ -1,27 +1,26 @@
 import streamlit as st
 import google.generativeai as genai
+import yt_dlp
 import time
 import os
+import re
 
 # --- 1. KONFIGURASI HALAMAN ---
 st.set_page_config(
-    page_title="Grok Masterpiece Architect", 
+    page_title="Grok Masterpiece - Omnipotent", 
     page_icon="👑", 
-    layout="wide", 
+    layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# CSS Responsif & UI (Optimasi untuk Android)
+# Custom CSS Responsif (Android & Desktop)
 st.markdown("""
     <style>
-    @media (max-width: 768px) { 
-        .main-header { font-size: 1.6rem !important; } 
-        [data-testid="column"] { width: 100% !important; flex: 1 1 100% !important; }
-    }
+    @media (max-width: 768px) { .main-header { font-size: 1.6rem !important; } [data-testid="column"] { width: 100% !important; } }
     .main-header { font-size: 2.8rem; font-weight: 800; color: #FFD700; text-align: center; margin-bottom: 5px; }
     .stButton>button { width: 100%; border-radius: 10px; font-weight: bold; background-color: #FF4B4B; color: white; height: 3em; }
+    .api-container { background-color: #1e272e; padding: 20px; border-radius: 15px; border: 1px solid #3d4e5e; margin-bottom: 20px; }
     .result-card { background-color: #1e272e; padding: 20px; border-radius: 15px; border-left: 5px solid #FFD700; margin-bottom: 20px; }
-    .stCodeBlock { border-radius: 10px !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -29,151 +28,165 @@ st.markdown("""
 if 'all_prompts' not in st.session_state: st.session_state.all_prompts = [] 
 if 'api_key_saved' not in st.session_state: st.session_state.api_key_saved = "" 
 if 'api_active' not in st.session_state: st.session_state.api_active = False
+if 'auto_dance_name' not in st.session_state: st.session_state.auto_dance_name = ""
+if 'dl_path' not in st.session_state: st.session_state.dl_path = None
 
-# --- 3. HEADER ---
-st.markdown('<p class="main-header">👑 GROK MOTION ARCHITECT</p>', unsafe_allow_html=True)
-st.markdown('<p style="text-align: center; color: #bdc3c7;">Official Grok Format • Batch Processing • Android Responsive</p>', unsafe_allow_html=True)
+# --- 3. FUNGSI OMNIPOTENT DOWNLOADER ---
+def get_video_info_and_download(url):
+    if not os.path.exists('downloads'): os.makedirs('downloads')
+    
+    # Opsi yt-dlp untuk kualitas terbaik & Metadata
+    ydl_opts = {
+        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        'outtmpl': 'downloads/%(title)s.%(ext)s',
+        'quiet': True,
+        'no_warnings': True,
+    }
+    
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        # Deteksi lagu dari metadata TikTok/YouTube
+        track = info.get('track')
+        artist = info.get('artist')
+        title = info.get('title')
+        
+        if track and artist:
+            detected_name = f"{artist} - {track}"
+        elif track:
+            detected_name = track
+        else:
+            # Bersihkan judul dari karakter aneh jika tidak ada track info
+            detected_name = re.sub(r'[^\w\s]', '', title).split('\n')[0]
+            
+        video_path = ydl.prepare_filename(info)
+        return video_path, detected_name
 
 # --- 4. API KEY MANAGER ---
+st.markdown('<p class="main-header">👑 GROK MOTION ARCHITECT PRO</p>', unsafe_allow_html=True)
 col_k1, col_k2, col_k3 = st.columns([1, 2, 1])
 with col_k2:
+    st.markdown('<div class="api-container">', unsafe_allow_html=True)
     if not st.session_state.api_active:
-        new_key = st.text_input("Enter Gemini API Key:", type="password", help="Dapatkan di aistudio.google.com")
-        if st.button("💾 Save & Active"):
+        new_key = st.text_input("Enter Gemini API Key:", type="password")
+        if st.button("💾 Save & Active API"):
             if new_key.startswith("AIza"):
-                st.session_state.api_key_saved = new_key
-                st.session_state.api_active = True
-                st.rerun()
-            else:
-                st.error("Invalid API Key! Harus diawali dengan 'AIza'")
+                st.session_state.api_key_saved = new_key; st.session_state.api_active = True; st.rerun()
+            else: st.error("Invalid Key! Harus diawali AIza")
     else:
         st.success("✅ API Key Active")
-        if st.button("🗑️ Change API Key"):
-            st.session_state.api_active = False
-            st.rerun()
+        if st.button("🗑️ Change Key"): st.session_state.api_active = False; st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# Konfigurasi Global API (Penting diletakkan di luar agar stabil)
-if st.session_state.api_active:
-    genai.configure(api_key=st.session_state.api_key_saved)
-
-st.divider()
-
-# --- 5. CONTROL PANEL (SIDEBAR) ---
+# --- 5. SIDEBAR: EPIC CONTROLS ---
 with st.sidebar:
     st.markdown("## 🎛️ Studio Settings")
     
     with st.expander("🎶 Context & Energy", expanded=True):
-        dance_name = st.text_input("Nama Tarian/Lagu:", placeholder="Contoh: Tor Monitor Ketua")
-        energy_lvl = st.select_slider("Vibe Kecepatan:", options=["Slow/Gentle", "Smooth", "Energetic"])
+        # Gunakan session state untuk auto-fill
+        dance_name_input = st.text_input("Nama Tarian/Lagu:", value=st.session_state.auto_dance_name)
+        energy_lvl = st.select_slider("Vibe Kecepatan:", options=["Slow", "Smooth", "Energetic"])
 
-    with st.expander("📸 Sinematografi", expanded=True):
-        camera_gear = st.selectbox("Lensa:", ["Sony A7R IV, 35mm f/1.8", "Arri Alexa, 50mm Cinematic", "iPhone 15 Pro Max"])
-        cam_movement = st.selectbox("Gerakan Kamera:", ["slow pan right", "slow pan left", "gentle dolly forward", "subtle tracking shot", "static with slight handheld"])
+    with st.expander("📸 Sinematografi", expanded=False):
+        camera_gear = st.selectbox("Lensa:", ["Sony A7R IV, 35mm f/1.8", "Arri Alexa, 50mm", "iPhone 15 Pro Max"])
+        cam_movement = st.selectbox("Gerakan:", ["slow pan right", "gentle dolly forward", "static handheld"])
         shot_type = st.selectbox("Tipe Shot:", ["Full Body Wide Shot", "Medium Shot", "Close-up Focus"])
 
-    with st.expander("🧬 Realisme & Soul", expanded=True):
-        realism = st.select_slider("Tekstur Kulit:", options=["Standard", "Detailed", "Hyper-Real"])
-        mannerisms = st.multiselect("Soul:", ["Natural Blinking", "Fixing hair", "Adjusting outfit", "Rhythmic breathing"], default=["Natural Blinking"])
+    with st.expander("🧬 Realisme & Soul", expanded=False):
+        realism = st.select_slider("Tekstur:", options=["Standard", "Detailed", "Hyper-Real"])
+        mannerisms = st.multiselect("Soul:", ["Natural Blinking", "Fixing hair", "Adjusting outfit"], default=["Natural Blinking"])
         face_expr = st.selectbox("Ekspresi:", ["Warm smile", "Playful wink", "Confident smirk", "Joyful laugh"])
 
-    with st.expander("🌬️ Fisika & Lighting", expanded=True):
-        wind_power = st.select_slider("Angin:", options=["soft breeze", "gentle wind", "windy"])
-        lighting_fx = st.selectbox("Lighting:", ["Cinematic lighting", "Golden hour glow", "Studio professional", "Natural sunlight", "Moody atmosphere"])
-        vfx_particles = st.selectbox("Efek VFX:", ["None", "Floating dust", "Falling petals", "Golden sparkles", "Cinematic rain"])
+    st.markdown("---")
+    bahasa = st.radio("Output Language:", ("English", "Bahasa Indonesia"))
 
-    bahasa = st.radio("Bahasa Output:", ("English", "Bahasa Indonesia"))
+# --- 6. INPUT MODE: LINK VS MANUAL ---
+st.markdown("### 🎬 1. Input Reference Video")
+tab_link, tab_manual = st.tabs(["🔗 Download via Link (TikTok/YT/IG)", "📁 Upload Manual (Batch)"])
 
-# --- 6. MULTI-VIDEO UPLOADER ---
-uploaded_files = st.file_uploader("Upload Video Referensi (Batch)", type=["mp4", "mov", "avi"], accept_multiple_files=True)
-
-if uploaded_files:
-    cols = st.columns(min(len(uploaded_files), 3))
-    for idx, file in enumerate(uploaded_files):
-        with cols[idx % 3]: st.video(file)
-
-    if st.button("🔥 GENERATE OFFICIAL GROK PROMPT", disabled=not st.session_state.api_active):
-        st.session_state.all_prompts = [] 
-        # PERBAIKAN: Gunakan nama model yang valid (1.5-flash-latest atau 2.0-flash-exp)
-        model = genai.GenerativeModel(model_name="gemini-2.5-flash")
-
-        for i, uploaded_file in enumerate(uploaded_files):
-            with st.status(f"Grok-Style Precision Analysis: {uploaded_file.name}...") as status:
+with tab_link:
+    input_url = st.text_input("Tempel Link Video Di Sini:", placeholder="https://www.tiktok.com/@user/video/...")
+    if st.button("📥 Process Link & Auto-Fill"):
+        if input_url and st.session_state.api_active:
+            with st.spinner("Mengunduh & Mendeteksi Lagu..."):
                 try:
-                    temp_path = f"temp_{i}_{uploaded_file.name}"
-                    with open(temp_path, "wb") as f: f.write(uploaded_file.getbuffer())
+                    path, name = get_video_info_and_download(input_url)
+                    st.session_state.dl_path = path
+                    st.session_state.auto_dance_name = name
+                    st.success(f"Video Siap! Terdeteksi: {name}")
+                    st.rerun()
+                except Exception as e: st.error(f"Download Error: {e}")
+        else: st.warning("Masukkan Link & Pastikan API Key Active!")
 
-                    video_file = genai.upload_file(path=temp_path)
-                    while video_file.state.name == "PROCESSING": 
-                        time.sleep(2)
-                        video_file = genai.get_file(video_file.name)
+    if st.session_state.dl_path:
+        st.video(st.session_state.dl_path)
+        if st.button("🗑️ Clear Downloaded Video"):
+            if os.path.exists(st.session_state.dl_path): os.remove(st.session_state.dl_path)
+            st.session_state.dl_path = None; st.session_state.auto_dance_name = ""; st.rerun()
 
-                    instruction = f"""
-                    Analyze this dance choreography. The dance is '{dance_name if dance_name else "Unknown Trend"}'.
-                    Task: Provide a highly detailed 1-second interval skeletal motion breakdown focusing on weight shift and limb trajectory.
-                    Separate with '---SEPARATOR---' for Part 1 (0-10s) and Part 2 (10-20s).
-                    """
+with tab_manual:
+    uploaded_files = st.file_uploader("Upload video (banyak sekaligus)", type=["mp4", "mov", "avi"], accept_multiple_files=True)
+    if uploaded_files:
+        m_cols = st.columns(3)
+        for idx, f in enumerate(uploaded_files):
+            with m_cols[idx % 3]: st.video(f)
+
+# --- 7. PROSES GENERATE (INTEGRASI TOTAL) ---
+st.divider()
+if st.button("🔥 GENERATE OFFICIAL GROK PROMPT", disabled=not st.session_state.api_active):
+    st.session_state.all_prompts = []
+    genai.configure(api_key=st.session_state.api_key_saved)
+    model = genai.GenerativeModel(model_name="gemini-2.5-flash")
+
+    # Daftar video untuk diproses (Download + Manual)
+    queue = []
+    if st.session_state.dl_path: queue.append(('link', st.session_state.dl_path))
+    if uploaded_files: 
+        for f in uploaded_files: queue.append(('manual', f))
+
+    if not queue:
+        st.error("Tidak ada video untuk diproses!")
+    else:
+        for v_type, v_source in queue:
+            v_display_name = os.path.basename(v_source) if v_type == 'link' else v_source.name
+            with st.status(f"Analysing: {v_display_name}...") as status:
+                try:
+                    # Upload ke Gemini
+                    if v_type == 'link':
+                        video_file = genai.upload_file(path=v_source)
+                    else:
+                        temp_p = f"temp_{v_display_name}"
+                        with open(temp_p, "wb") as f: f.write(v_source.getbuffer())
+                        video_file = genai.upload_file(path=temp_p)
+
+                    while video_file.state.name == "PROCESSING": time.sleep(2); video_file = genai.get_file(video_file.name)
+
+                    # Analisa Gemini
+                    instruction = f"Analyze dance choreography for '{dance_name_input}'. Extract ONLY skeletal motion 1s intervals for 20s. Separate Part 1 (0-10s) and 2 (10-20s) with '---SEPARATOR---'."
                     response = model.generate_content([video_file, instruction])
                     raw_motion = response.text
 
-                    # --- PROMPT BUILDER (OFFICIAL GROK FORMAT) ---
-                    tex_mantra = "Visible skin pores, realistic skin texture, subsurface scattering. " if realism == "Hyper-Real" else "High detail skin texture. "
-                    soul_str = ", ".join(mannerisms)
-                    vfx_str = f"{vfx_particles} particles in the air" if vfx_particles != "None" else "clear atmosphere"
+                    # FORMAT GROK OFFICIAL
+                    p1_text = raw_motion.split('---SEPARATOR---')[0] if '---SEPARATOR---' in raw_motion else raw_motion
+                    p2_text = raw_motion.split('---SEPARATOR---')[1] if '---SEPARATOR---' in raw_motion else "fluid sequence"
                     
-                    p1_text = raw_motion.split('---SEPARATOR---')[0].strip() if '---SEPARATOR---' in raw_motion else raw_motion
-                    p2_text = raw_motion.split('---SEPARATOR---')[1].strip() if '---SEPARATOR---' in raw_motion else "continuing the fluid dance sequence"
+                    final_p1 = f"A cinematic 10s video. [SUBJEK] Woman in image dancing '{dance_name_input}'. [CAMERA] {cam_movement} {shot_type}. [MOTION] {p1_text} [STYLE] {lighting_setup}, {realism} pores, {face_expr}. [TECHNICAL] 24fps, coherent physics."
+                    final_p2 = f"Continue 10s seamlessly. [LANJUTAN] {p2_text}. [MOTION CONTROL] {energy_lvl.lower()} pacing. [CONSISTENCY] Same outfit/background."
 
-                    p1 = f"""A highly detailed cinematic 10-second video. 
-
-[SUBJEK UTAMA + AKSI]
-A young woman as seen in the reference image is performing the '{dance_name}' choreography in the exact same room and background from the image. 
-
-[CAMERA MOVEMENT]
-Camera {cam_movement} in a {shot_type}, revealing smooth and {energy_lvl.lower()} transitions. {camera_gear} lens feel.
-
-[MOTION DETAIL]
-{p1_text}
-Every movement is natural with smooth motion. Human mannerisms: {soul_str}. {wind_power} effect on hair and outfit.
-
-[STYLE & MOOD]
-{lighting_fx}, {vfx_str}, {tex_mantra} {face_expr}, realistic filmic style. [VISUAL LOCK] Use image as ABSOLUTE visual reference. Strictly maintain exact character appearance, outfit, and environment. No morphing.
-
-[TECHNICAL]
-Smooth motion, high quality, 10 seconds duration, 24fps, natural physics, no sudden jumps, coherent movement, latent space stabilization."""
-
-                    p2 = f"""Continue the previous 10-second video seamlessly for another 10 seconds.
-
-[LANJUTAN AKSI]
-The woman continues the '{dance_name}' dance choreography naturally from the previous clip. 
-
-[MOTION CONTROL]
-- Camera movement: {cam_movement}
-- Character/Object motion: {p2_text}, {soul_str}, {wind_power} blowing hair.
-- Speed: {energy_lvl.lower()} cinematic pacing, no fast movements, coherent skeleton dynamics.
-
-[CONSISTENCY]
-Maintain exact same character appearance, clothing, lighting, and environment from the previous clip. Smooth transition, no jump cuts.
-
-[STYLE]
-{lighting_fx}, {tex_mantra} cinematic filmic color grade, high detail, natural physics, 10 seconds, smooth motion, coherent continuation."""
-
-                    st.session_state.all_prompts.append({
-                        "name": uploaded_file.name, "p1": p1, "p2": p2, "video": uploaded_file
-                    })
-
-                    genai.delete_file(video_file.name); os.remove(temp_path)
-                    status.update(label=f"Done: {uploaded_file.name}", state="complete")
+                    st.session_state.all_prompts.append({"name": v_display_name, "p1": final_p1, "p2": final_p2, "video": v_source})
+                    
+                    if v_type == 'manual': os.remove(temp_p)
+                    genai.delete_file(video_file.name)
+                    status.update(label=f"Analysis Complete: {v_display_name}", state="complete")
                 except Exception as e: st.error(f"Error: {e}")
 
-# --- 7. STUDIO DISPLAY ---
+# --- 8. STUDIO DISPLAY ---
 if st.session_state.all_prompts:
-    st.markdown("### 🚀 Final Motion Prompts")
-    for idx, item in enumerate(st.session_state.all_prompts):
+    st.markdown("### 🚀 2. Final Motion Prompts")
+    for item in st.session_state.all_prompts:
         with st.container():
-            st.markdown(f'<div class="result-card"><h4>🎥 Video Reference: {item["name"]}</h4></div>', unsafe_allow_html=True)
-            col_res1, col_res2 = st.columns([1, 2])
-            with col_res1: st.video(item['video'])
+            st.markdown(f'<div class="result-card"><h4>🎥 Result: {item["name"]}</h4></div>', unsafe_allow_html=True)
+            col_r1, col_r2 = st.columns([1, 2])
+            with col_r1: st.video(item['video'])
             with col_res2:
-                t1, t2 = st.tabs(["📌 Prompt 1 (Main 10s)", "📌 Prompt 2 (Extend 10s)"])
-                with t1: st.code(item['p1'], language="text")
-                with t2: st.code(item['p2'], language="text")
+                t1, t2 = st.tabs(["📌 Prompt 1 (Main)", "📌 Prompt 2 (Extend)"])
+                t1.code(item['p1']); t2.code(item['p2'])

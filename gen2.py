@@ -8,7 +8,7 @@ import subprocess
 from datetime import datetime
 
 # ==================== PAGE CONFIG ====================
-st.set_page_config(page_title="GROK APEX CHOICE", page_icon="⚡", layout="wide")
+st.set_page_config(page_title="GROK APEX V2", page_icon="⚡", layout="wide")
 
 # ==================== CUSTOM CSS ====================
 st.markdown("""
@@ -131,13 +131,13 @@ def advanced_download(url: str):
     return video_bytes, song_name, "ready_video.mp4"
 
 # ==================== HEADER ====================
-st.markdown('<p class="main-header">GROK APEX CHOICE</p>', unsafe_allow_html=True)
-st.markdown('<p style="text-align:center; color:#aaa; margin-top:-8px; font-size:1.05rem;">Prompt Choice • API Key Manager • History • Batch Link</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-header">GROK APEX V2</p>', unsafe_allow_html=True)
+st.markdown('<p style="text-align:center; color:#aaa; margin-top:-8px; font-size:1.05rem;">Image-to-Video Optimized • Per-Video Dance Name • Prompt Choice • API Key Manager</p>', unsafe_allow_html=True)
 
 # ==================== API KEY MANAGER ====================
 with st.container():
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    st.markdown("### 🔑 API KEY MANAGER (Simpan Sekali, Pakai Selamanya)")
+    st.markdown("### 🔑 API KEY MANAGER")
 
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -164,7 +164,7 @@ with st.container():
     with col_status:
         if st.session_state.api_saved:
             active = len([k for k in st.session_state.api_keys if k.strip()])
-            st.success(f"✅ {active} API Key tersimpan dan siap digunakan")
+            st.success(f"✅ {active} API Key tersimpan")
         else:
             st.info("⚠️ Klik 'Simpan' setelah memasukkan API Key")
 
@@ -210,7 +210,7 @@ st.markdown("### 🚀 BATCH INSTANT LINK")
 
 with st.container():
     st.markdown('<div class="instant-box">', unsafe_allow_html=True)
-    st.markdown("**Paste banyak link (satu per baris) → Otomatis masuk ke Ready to Generate + History**")
+    st.markdown("**Paste banyak link → Otomatis masuk ke Ready + History**")
 
     links_text = st.text_area("🔗 Paste Links (satu per baris)", height=100, placeholder="https://www.tiktok.com/@user/video/111\nhttps://www.tiktok.com/@user/video/222")
 
@@ -351,31 +351,57 @@ if st.button("🔥 GENERATE OFFICIAL PROMPT", disabled=not st.session_state.api_
                         time.sleep(2)
                         vf = genai.get_file(vf.name)
 
-                    analysis_prompt = f"Analyze this dance video. Trend/Song: {song}. Provide detailed 1-second skeletal motion breakdown. Separate Part 1 and Part 2 with '---SEPARATOR---'."
+                    analysis_prompt = f"""Analyze this dance video. Trend/Song: {song}.
+Provide detailed 1-second skeletal motion breakdown with:
+- Motion Trajectory (jalur gerakan)
+- Weight Distribution (titik berat)
+Separate Part 1 (0-10s) and Part 2 (10-20s) with '---SEPARATOR---'."""
+
                     response = model.generate_content([vf, analysis_prompt])
                     raw = response.text
 
                     part1 = raw.split("---SEPARATOR---")[0].strip() if "---SEPARATOR---" in raw else raw
                     part2 = raw.split("---SEPARATOR---")[1].strip() if "---SEPARATOR---" in raw else "continuing smoothly"
 
+                    # PROMPT 1 - Original
                     p1 = f"""Cinematic 10-second video.
 [SUBJECT] Young woman dancing '{song}' in exact same outfit and location from reference.
 [CAMERA] {camera}.
 [MOTION] {part1}
 [STYLE] {style}, realistic film look, natural physics, high detail.
 [VISUAL LOCK] Strictly maintain exact character, clothing, and background.
-[TECHNICAL] 24fps, smooth motion, coherent movement."""
+[TECHNICAL] 24fps, smooth motion, coherent movement, Temporal Consistency, Latent Space Stabilization."""
 
+                    # PROMPT 2 - Extend
                     p2 = f"""Seamless continuation for another 10 seconds.
 [CONTINUATION] {part2}
-[CONSISTENCY] Same character, lighting, outfit, and environment."""
+[CONSISTENCY] Same character, lighting, outfit, and environment.
+[TECHNICAL] 24fps, smooth motion, coherent movement, Temporal Consistency."""
+
+                    # PROMPT 3 - Image-to-Video Optimized (Main)
+                    p3 = f"""Cinematic 10-second video of a young woman dancing '{song}' in the exact same outfit and location as the reference image.
+
+Camera: {camera}. Smooth and natural movement with realistic physics and weight distribution. Highly detailed, filmic color grade, natural lighting.
+
+Strict visual consistency with the reference image as the first frame. No morphing.
+
+{part1[:350]}..."""
+
+                    # PROMPT 4 - Image-to-Video Optimized (Extend)
+                    p4 = f"""Seamless 10-second continuation of the previous clip.
+
+Smooth camera movement, natural physics, weight shift, and coherent motion. Maintain exact same character, lighting, and environment.
+
+{part2[:300]}..."""
 
                     st.session_state.all_prompts.append({
                         "name": name,
+                        "song": song,
                         "p1": p1,
                         "p2": p2,
-                        "video": video["bytes"],
-                        "song": song
+                        "p3": p3,
+                        "p4": p4,
+                        "video": video["bytes"]
                     })
 
                     os.remove(temp_path)
@@ -397,7 +423,11 @@ if st.session_state.all_prompts:
             # PILIHAN PROMPT
             prompt_choice = st.radio(
                 "Pilih Versi Prompt:",
-                ["Original (Detail)", "Image-to-Video Optimized (Pendek & Sinematik)"],
+                [
+                    "Original (Detail)",
+                    "Image-to-Video Optimized (Main)",
+                    "Image-to-Video Optimized (Extend)"
+                ],
                 key=f"choice_{i}",
                 horizontal=True
             )
@@ -410,21 +440,16 @@ if st.session_state.all_prompts:
                     t1, t2 = st.tabs(["Prompt 1 (10s)", "Prompt 2 (Extend)"])
                     t1.code(item['p1'])
                     t2.code(item['p2'])
+                elif prompt_choice == "Image-to-Video Optimized (Main)":
+                    st.code(item['p3'])
+                    if st.button(f"📋 Copy Main Optimized", key=f"copy_main_{i}"):
+                        st.toast("✅ Prompt berhasil disalin!")
                 else:
-                    # Versi Optimized untuk Image-to-Video
-                    optimized = f"""Cinematic 10-second video of a young woman dancing '{item.get('song', item['name'])}' in the exact same outfit and location as the reference image.
-
-Camera: {camera}. Smooth and natural movement with realistic physics. Highly detailed, filmic color grade, natural lighting.
-
-Strict visual consistency with the reference image. No morphing.
-
-{item['p1'][:450]}..."""
-
-                    st.code(optimized)
-                    if st.button(f"📋 Copy Optimized Prompt", key=f"copy_opt_{i}"):
+                    st.code(item['p4'])
+                    if st.button(f"📋 Copy Extend Optimized", key=f"copy_extend_{i}"):
                         st.toast("✅ Prompt berhasil disalin!")
 
             st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown("---")
-st.markdown("<p style='text-align:center; color:#666; font-size:0.85rem;'>GROK APEX CHOICE • Prompt Choice + API Key Manager • Powered by Gemini + yt-dlp + FFmpeg</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:#666; font-size:0.85rem;'>GROK APEX V2 • Prompt Choice + Image-to-Video Optimized • Powered by Gemini + yt-dlp + FFmpeg</p>", unsafe_allow_html=True)

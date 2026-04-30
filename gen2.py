@@ -8,7 +8,7 @@ import subprocess
 from datetime import datetime
 
 # ==================== PAGE CONFIG ====================
-st.set_page_config(page_title="GROK APEX V3", page_icon="⚡", layout="wide")
+st.set_page_config(page_title="GROK APEX V4", page_icon="⚡", layout="wide")
 
 # ==================== CUSTOM CSS ====================
 st.markdown("""
@@ -82,6 +82,7 @@ if 'api_saved' not in st.session_state: st.session_state.api_saved = False
 if 'reference_videos' not in st.session_state: st.session_state.reference_videos = []
 if 'link_history' not in st.session_state: st.session_state.link_history = []
 if 'dance_names' not in st.session_state: st.session_state.dance_names = {}
+if 'captions' not in st.session_state: st.session_state.captions = {}
 
 # ==================== ADVANCED DOWNLOAD ====================
 def advanced_download(url: str):
@@ -131,8 +132,8 @@ def advanced_download(url: str):
     return video_bytes, song_name, "ready_video.mp4"
 
 # ==================== HEADER ====================
-st.markdown('<p class="main-header">GROK APEX V2</p>', unsafe_allow_html=True)
-st.markdown('<p style="text-align:center; color:#aaa; margin-top:-8px; font-size:1.05rem;">Prompt Choice • API Key Manager • History • Batch Link</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-header">GROK APEX V4</p>', unsafe_allow_html=True)
+st.markdown('<p style="text-align:center; color:#aaa; margin-top:-8px; font-size:1.05rem;">Music Control • Auto Caption • Prompt Choice • API Key Manager</p>', unsafe_allow_html=True)
 
 # ==================== API KEY MANAGER ====================
 with st.container():
@@ -176,12 +177,23 @@ with st.sidebar:
     
     # === BASIC ===
     style = st.selectbox("🎨 Visual Style", ["Hyper-Realistic", "Cinematic", "TikTok Viral", "Film Look"])
-    camera = st.selectbox("📷 Camera Movement", ["Static", "Slow Zoom In", "Gentle Pan", "Handheld"])
+    camera = st.selectbox("📷 Camera Movement", [
+        "Static", "Slow Zoom In", "Gentle Pan", "Handheld",
+        "Speed Ramp (Fast → Slow)", "Arc Shot (Melingkar)", "Dolly In", "Truck Left/Right",
+        "Crane Up", "Orbit Shot", "Push In", "Pull Out"
+    ])
     language = st.radio("🌍 Language", ["English", "Bahasa Indonesia"])
 
     st.markdown("---")
     
-    # === HUMAN QUIRKS & MANNERISMS ===
+    # === MUSIC CONTROL (BARU) ===
+    st.markdown("### 🎵 Music Control")
+    manual_music = st.text_input("Nama Lagu / Musik (Manual)", placeholder="Kosongkan jika ingin otomatis")
+    st.caption("Jika diisi manual, akan menggantikan deteksi otomatis")
+
+    st.markdown("---")
+    
+    # === HUMAN QUIRKS ===
     st.markdown("### 👤 Human Quirks & Mannerisms")
     mannerisms = st.multiselect(
         "Pilih Gerakan Manusiawi:",
@@ -218,11 +230,11 @@ with st.sidebar:
 
     st.markdown("---")
     
-    # === WIND POWER ===
-    st.markdown("### 🌬️ Wind Power (Hair & Fabric Physics)")
+    # === WIND & HAIR FLOW (BARU) ===
+    st.markdown("### 🌬️ Wind & Hair Flow")
     wind = st.selectbox(
         "Kekuatan Angin:",
-        ["None", "Soft Breeze", "Gentle Wind", "Windy"]
+        ["None", "Breeze (Angin Sepoi)", "Windy (Berangin)", "Stormy (Badai)"]
     )
 
     st.markdown("---")
@@ -236,7 +248,7 @@ with st.sidebar:
     # === NEGATIVE PROMPT ===
     st.markdown("### 🚫 Negative Prompt (Anti-Glitch)")
     negative_prompt = st.text_area(
-        "Kata yang DILARANG (otomatis ditambahkan):",
+        "Kata yang DILARANG:",
         value="3d render, cartoonish, plastic skin, deformed hands, blurry face, text, watermark, logo",
         height=60
     )
@@ -384,6 +396,7 @@ with st.container():
 # ==================== 🔥 GENERATE ====================
 if st.button("🔥 GENERATE OFFICIAL PROMPT", disabled=not st.session_state.api_saved or len(st.session_state.reference_videos) == 0):
     st.session_state.all_prompts = []
+    st.session_state.captions = {}
     
     active_keys = [k for k in st.session_state.api_keys if k.strip().startswith("AIza")]
     if not active_keys:
@@ -405,6 +418,9 @@ if st.button("🔥 GENERATE OFFICIAL PROMPT", disabled=not st.session_state.api_
             name = video["name"]
             song = st.session_state.dance_names.get(name, name)
 
+            # Gunakan manual music jika diisi
+            final_song = manual_music if manual_music.strip() else song
+
             with st.status(f"Analyzing {name} (Key {key_idx+1})...") as status:
                 try:
                     temp_path = f"temp_{name.replace(' ', '_')}.mp4"
@@ -420,7 +436,6 @@ if st.button("🔥 GENERATE OFFICIAL PROMPT", disabled=not st.session_state.api_
                     vfx_str = f"{vfx} particles in the air" if vfx != "None" else "clear atmosphere"
                     wind_str = f"{wind} blowing hair and clothes" if wind != "None" else "still air"
                     
-                    # Multi-angle
                     if multi_angle:
                         shot_p1 = "Wide Shot (Full Body) for the first 7 seconds, then smooth zoom to Medium Shot (Waist Up) for the remaining 3 seconds"
                         shot_p2 = "Close-up shot focusing on facial expression and upper body movement"
@@ -428,7 +443,7 @@ if st.button("🔥 GENERATE OFFICIAL PROMPT", disabled=not st.session_state.api_
                         shot_p1 = "Full Body Wide Shot throughout"
                         shot_p2 = "Full Body Wide Shot throughout"
 
-                    analysis_prompt = f"""Analyze this dance video. Trend/Song: {song}.
+                    analysis_prompt = f"""Analyze this dance video. Trend/Song: {final_song}.
 Provide detailed 1-second skeletal motion breakdown with:
 - Motion Trajectory (jalur gerakan tangan & kaki)
 - Weight Distribution (perpindahan berat badan)
@@ -442,7 +457,7 @@ Separate Part 1 (0-10s) and Part 2 (10-20s) with '---SEPARATOR---'."""
 
                     # === PROMPT 1 - ORIGINAL ===
                     p1 = f"""Cinematic 10-second video.
-[SUBJECT] Young woman dancing '{song}' in exact same outfit and location from reference.
+[SUBJECT] Young woman dancing '{final_song}' in exact same outfit and location from reference.
 [CAMERA] {camera}. {shot_p1}.
 [MOTION] {part1}. {quirks}.
 [STYLE] {style}, {lighting}, {color_grade} color grade, {vfx_str}, {wind_str}, realistic film look, natural physics, high detail.
@@ -457,7 +472,7 @@ Separate Part 1 (0-10s) and Part 2 (10-20s) with '---SEPARATOR---'."""
 [TECHNICAL] 24fps, smooth motion, coherent movement, Temporal Consistency."""
 
                     # === PROMPT 3 - IMAGE-TO-VIDEO OPTIMIZED (MAIN) ===
-                    p3 = f"""Cinematic 10-second video of a young woman dancing '{song}' in the exact same outfit and location as the reference image.
+                    p3 = f"""Cinematic 10-second video of a young woman dancing '{final_song}' in the exact same outfit and location as the reference image.
 
 Camera: {camera}. {shot_p1}. Smooth and natural movement with realistic physics and weight distribution. Highly detailed skin with visible pores and subsurface scattering. Film grain, natural lighting, {color_grade} color grade.
 
@@ -472,15 +487,22 @@ Smooth camera movement, natural physics, weight shift, and coherent motion. Main
 
 {part2[:350]}..."""
 
+                    # === AUTO TIKTOK CAPTION ===
+                    caption_prompt = f"Buatkan caption viral TikTok + 5 hashtag untuk video tari dengan lagu '{final_song}'. Buat dalam bahasa Indonesia, singkat, dan menarik."
+                    caption_response = model.generate_content(caption_prompt)
+                    caption = caption_response.text
+
                     st.session_state.all_prompts.append({
                         "name": name,
-                        "song": song,
+                        "song": final_song,
                         "p1": p1,
                         "p2": p2,
                         "p3": p3,
                         "p4": p4,
                         "video": video["bytes"]
                     })
+
+                    st.session_state.captions[name] = caption
 
                     os.remove(temp_path)
                     genai.delete_file(vf.name)
@@ -489,9 +511,15 @@ Smooth camera movement, natural physics, weight shift, and coherent motion. Main
                 except Exception as e:
                     st.error(f"Error analyzing {name}: {e}")
 
-# ==================== RESULTS + PILIHAN PROMPT ====================
+# ==================== RESULTS + PILIHAN PROMPT + CAPTION ====================
 if st.session_state.all_prompts:
     st.markdown("### 📜 FINAL PROMPTS (Pilih Versi yang Kamu Suka)")
+
+    # Tombol Clear Content
+    if st.button("🗑️ CLEAR ALL CONTENT", type="secondary"):
+        st.session_state.all_prompts = []
+        st.session_state.captions = []
+        st.rerun()
 
     for i, item in enumerate(st.session_state.all_prompts):
         with st.container():
@@ -527,7 +555,14 @@ if st.session_state.all_prompts:
                     if st.button(f"📋 Copy Extend Optimized", key=f"copy_extend_{i}"):
                         st.toast("✅ Prompt berhasil disalin!")
 
+            # AUTO TIKTOK CAPTION (TERPISAH)
+            if item['name'] in st.session_state.captions:
+                st.markdown("**📱 Auto TikTok Caption + Hashtag:**")
+                st.code(st.session_state.captions[item['name']])
+                if st.button(f"📋 Copy Caption", key=f"copy_cap_{i}"):
+                    st.toast("✅ Caption berhasil disalin!")
+
             st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown("---")
-st.markdown("<p style='text-align:center; color:#666; font-size:0.85rem;'>GROK APEX V2 • Advanced Master Control + Prompt Choice • Powered by Gemini + yt-dlp + FFmpeg</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:#666; font-size:0.85rem;'>GROK APEX V4 • Music Control + Auto Caption + Prompt Choice • Powered by Gemini + yt-dlp + FFmpeg</p>", unsafe_allow_html=True)

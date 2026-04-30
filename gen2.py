@@ -1,34 +1,44 @@
 import streamlit as st
 import google.generativeai as genai
 import yt_dlp
+import time
 import os
 import re
 import base64
 
 # --- 1. KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="GROK APEX ARCHITECT", page_icon="⚡", layout="wide")
+st.set_page_config(
+    page_title="GROK APEX ARCHITECT", 
+    page_icon="⚡", 
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-# --- 2. FUTURISTIC CSS & HTML PLAYER ---
+# --- 2. FUTURISTIC CSS & CUSTOM PLAYER ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&family=Inter:wght@300;400;700&display=swap');
     html, body, [data-testid="stAppViewContainer"] { background-color: #050505; font-family: 'Inter', sans-serif; }
-    .main-header { font-family: 'Orbitron', sans-serif; font-size: 2.5rem; font-weight: 900; background: linear-gradient(90deg, #FFD700, #FF4B4B); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; margin-bottom: 20px; }
+    .main-header { font-family: 'Orbitron', sans-serif; font-size: 2.2rem; font-weight: 900; background: linear-gradient(90deg, #FFD700, #FF4B4B); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; margin-bottom: 20px; }
     .glass-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border-radius: 20px; padding: 20px; margin-bottom: 20px; }
+    @media (max-width: 768px) { .main-header { font-size: 1.5rem !important; } }
     .stButton>button { width: 100%; border-radius: 12px; font-weight: 700; background: linear-gradient(45deg, #FF4B4B, #800000); color: white; border: none; height: 3.5em; }
     </style>
 """, unsafe_allow_html=True)
 
-# Fungsi untuk menampilkan video dengan HTML5 Player (Pasti muncul gambar & suara)
+# Fungsi untuk menampilkan video dengan HTML5 Player (Solusi Gambar & Suara)
 def render_video_custom(video_bytes):
-    b64 = base64.b64encode(video_bytes).decode()
-    video_html = f'''
-        <video width="100%" controls autoplay muted style="border-radius: 15px; border: 1px solid #FFD700;">
-            <source src="data:video/mp4;base64,{b64}" type="video/mp4">
-            Your browser does not support the video tag.
-        </video>
-    '''
-    st.markdown(video_html, unsafe_allow_html=True)
+    try:
+        b64 = base64.b64encode(video_bytes).decode()
+        video_html = f'''
+            <video width="100%" controls style="border-radius: 15px; border: 1px solid #FFD700;">
+                <source src="data:video/mp4;base64,{b64}" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+        '''
+        st.markdown(video_html, unsafe_allow_html=True)
+    except:
+        st.error("Gagal merender preview video.")
 
 # --- 3. SESSION STATE ---
 if 'all_prompts' not in st.session_state: st.session_state.all_prompts = [] 
@@ -40,7 +50,6 @@ if 'prepared_video' not in st.session_state: st.session_state.prepared_video = N
 # --- 4. ENGINE: SYNC MUSIC & DOWNLOAD ---
 def sync_and_prepare(url):
     if not os.path.exists('downloads'): os.makedirs('downloads')
-    # Opsi yt-dlp yang SANGAT ketat agar MP4 kompatibel dengan browser
     ydl_opts = {
         'format': 'bestvideo[vcodec^=avc1]+bestaudio[acodec^=mp4a]/best[ext=mp4]/best',
         'outtmpl': 'downloads/%(id)s.%(ext)s',
@@ -51,8 +60,6 @@ def sync_and_prepare(url):
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         video_path = ydl.prepare_filename(info)
-        
-        # Deteksi Metadata
         detected_name = info.get('track') or info.get('title') or "Unknown Trend"
         detected_name = re.sub(r'[^\w\s]', '', detected_name).split('\n')[0]
         
@@ -60,8 +67,8 @@ def sync_and_prepare(url):
             v_bytes = f.read()
         return v_bytes, detected_name, os.path.basename(video_path)
 
-# --- 5. TOP SECTION ---
-st.markdown('<p class="main-header">GROK APEX ARCHITECT</p>', unsafe_allow_html=True)
+# --- 5. TOP SECTION: API MANAGER ---
+st.markdown('<p class="main-header">GROK APEX ARCHITECT PRO</p>', unsafe_allow_html=True)
 
 with st.container():
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
@@ -70,6 +77,7 @@ with st.container():
         if st.button("INITIALIZE CORE SYSTEM"):
             if key_input.startswith("AIza"):
                 st.session_state.api_key_saved = key_input; st.session_state.api_active = True; st.rerun()
+            else: st.error("Invalid API Key!")
     else:
         c1, c2 = st.columns([4, 1])
         c1.success("✅ SYSTEM ONLINE")
@@ -91,7 +99,7 @@ st.markdown("### 🎬 1. MOTION SOURCE")
 # Step 1: Link & Sync
 with st.container():
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    st.markdown("#### 🔗 Step 1: Music Sync & Download Video")
+    st.markdown("#### 🔗 Step 1: Sync Music & Download Video")
     url_input = st.text_input("Paste Link TikTok/YouTube:", placeholder="https://...")
     
     col_sync, col_dl = st.columns(2)
@@ -115,14 +123,14 @@ with st.container():
 with st.container():
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
     st.markdown("#### 📤 Step 2: Upload Video for Analysis")
-    up_files = st.file_uploader("Upload video yang sudah didownload (MP4)", type=["mp4", "mov"], accept_multiple_files=True)
+    up_files = st.file_uploader("Upload video MP4 (Batch)", type=["mp4", "mov"], accept_multiple_files=True)
     if up_files:
         cols = st.columns(min(len(up_files), 3))
         for idx, f in enumerate(up_files):
             with cols[idx % 3]:
-                # GUNAKAN CUSTOM PLAYER UNTUK PREVIEW UPLOAD
-                render_video_custom(f.read())
-                f.seek(0) # Reset pointer agar bisa dibaca lagi nanti
+                video_data = f.read()
+                render_video_custom(video_data)
+                f.seek(0) 
                 st.caption(f"📄 {f.name}")
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -133,7 +141,8 @@ if st.button("🔥 EXECUTE ANALYSIS"):
     else:
         st.session_state.all_prompts = []
         genai.configure(api_key=st.session_state.api_key_saved)
-        model = genai.GenerativeModel(model_name="gemini-2.5-flash)
+        # FIXED: Nama model dipastikan benar
+        model = genai.GenerativeModel(model_name="gemini-2.5-flash")
 
         for f in up_files:
             with st.status(f"Analysing {f.name}...") as status:
@@ -143,7 +152,9 @@ if st.button("🔥 EXECUTE ANALYSIS"):
                     with open(temp_p, "wb") as temp_f: temp_f.write(v_bytes)
                     
                     video_file = genai.upload_file(path=temp_p)
-                    while video_file.state.name == "PROCESSING": os.wait(); video_file = genai.get_file(video_file.name)
+                    while video_file.state.name == "PROCESSING": 
+                        time.sleep(2)
+                        video_file = genai.get_file(video_file.name)
                     
                     res = model.generate_content([video_file, f"Analyze dance for '{dance_name_input}'. 1s skeletal breakdown. Separate Part 1/2 with '---SEPARATOR---'."])
                     

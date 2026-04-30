@@ -73,7 +73,7 @@ if uploaded_files:
 
     if st.button("🔥 GENERATE OFFICIAL GROK PROMPT", disabled=not st.session_state.api_active):
         st.session_state.all_prompts = [] 
-        model = genai.GenerativeModel(model_name="gemini-2.5-flash")
+        model = genai.GenerativeModel(model_name="gemini-flash-latest")
 
         for i, uploaded_file in enumerate(uploaded_files):
             with st.status(f"Grok-Style Precision Analysis: {uploaded_file.name}...") as status:

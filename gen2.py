@@ -4,15 +4,24 @@ import time
 import os
 
 # --- 1. KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="Grok Masterpiece - Official Format", page_icon="👑", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(
+    page_title="Grok Masterpiece Architect", 
+    page_icon="👑", 
+    layout="wide", 
+    initial_sidebar_state="expanded"
+)
 
-# CSS Responsif & UI (Tetap Dipertahankan)
+# CSS Responsif & UI (Optimasi untuk Android)
 st.markdown("""
     <style>
-    @media (max-width: 768px) { .main-header { font-size: 1.6rem !important; } }
+    @media (max-width: 768px) { 
+        .main-header { font-size: 1.6rem !important; } 
+        [data-testid="column"] { width: 100% !important; flex: 1 1 100% !important; }
+    }
     .main-header { font-size: 2.8rem; font-weight: 800; color: #FFD700; text-align: center; margin-bottom: 5px; }
     .stButton>button { width: 100%; border-radius: 10px; font-weight: bold; background-color: #FF4B4B; color: white; height: 3em; }
     .result-card { background-color: #1e272e; padding: 20px; border-radius: 15px; border-left: 5px solid #FFD700; margin-bottom: 20px; }
+    .stCodeBlock { border-radius: 10px !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -23,48 +32,59 @@ if 'api_active' not in st.session_state: st.session_state.api_active = False
 
 # --- 3. HEADER ---
 st.markdown('<p class="main-header">👑 GROK MOTION ARCHITECT</p>', unsafe_allow_html=True)
-st.markdown('<p style="text-align: center; color: #bdc3c7;">Batch Processing with Official Grok AI Prompting Structures</p>', unsafe_allow_html=True)
+st.markdown('<p style="text-align: center; color: #bdc3c7;">Official Grok Format • Batch Processing • Android Responsive</p>', unsafe_allow_html=True)
 
-# --- 4. API KEY MANAGER (FITUR TETAP ADA) ---
+# --- 4. API KEY MANAGER ---
 col_k1, col_k2, col_k3 = st.columns([1, 2, 1])
 with col_k2:
     if not st.session_state.api_active:
-        new_key = st.text_input("Enter Gemini API Key:", type="password")
+        new_key = st.text_input("Enter Gemini API Key:", type="password", help="Dapatkan di aistudio.google.com")
         if st.button("💾 Save & Active"):
-            if new_key: st.session_state.api_key_saved = new_key; st.session_state.api_active = True; st.rerun()
+            if new_key.startswith("AIza"):
+                st.session_state.api_key_saved = new_key
+                st.session_state.api_active = True
+                st.rerun()
+            else:
+                st.error("Invalid API Key! Harus diawali dengan 'AIza'")
     else:
         st.success("✅ API Key Active")
-        if st.button("🗑️ Change Key"): st.session_state.api_active = False; st.rerun()
+        if st.button("🗑️ Change API Key"):
+            st.session_state.api_active = False
+            st.rerun()
+
+# Konfigurasi Global API (Penting diletakkan di luar agar stabil)
+if st.session_state.api_active:
+    genai.configure(api_key=st.session_state.api_key_saved)
 
 st.divider()
 
-# --- 5. CONTROL PANEL (FITUR EPIC TETAP LENGKAP) ---
+# --- 5. CONTROL PANEL (SIDEBAR) ---
 with st.sidebar:
-    st.markdown("## 🎛️ Control Panel")
+    st.markdown("## 🎛️ Studio Settings")
     
     with st.expander("🎶 Context & Energy", expanded=True):
         dance_name = st.text_input("Nama Tarian/Lagu:", placeholder="Contoh: Tor Monitor Ketua")
         energy_lvl = st.select_slider("Vibe Kecepatan:", options=["Slow/Gentle", "Smooth", "Energetic"])
 
     with st.expander("📸 Sinematografi", expanded=True):
-        camera_gear = st.selectbox("Gear:", ["Sony A7R IV, 35mm f/1.8", "Arri Alexa, 50mm Cinematic", "iPhone 15 Pro Max"])
+        camera_gear = st.selectbox("Lensa:", ["Sony A7R IV, 35mm f/1.8", "Arri Alexa, 50mm Cinematic", "iPhone 15 Pro Max"])
         cam_movement = st.selectbox("Gerakan Kamera:", ["slow pan right", "slow pan left", "gentle dolly forward", "subtle tracking shot", "static with slight handheld"])
         shot_type = st.selectbox("Tipe Shot:", ["Full Body Wide Shot", "Medium Shot", "Close-up Focus"])
 
     with st.expander("🧬 Realisme & Soul", expanded=True):
         realism = st.select_slider("Tekstur Kulit:", options=["Standard", "Detailed", "Hyper-Real"])
-        mannerisms = st.multiselect("Soul (Mannerisms):", ["Natural Blinking", "Fixing hair", "Adjusting outfit", "Rhythmic breathing"], default=["Natural Blinking"])
+        mannerisms = st.multiselect("Soul:", ["Natural Blinking", "Fixing hair", "Adjusting outfit", "Rhythmic breathing"], default=["Natural Blinking"])
         face_expr = st.selectbox("Ekspresi:", ["Warm smile", "Playful wink", "Confident smirk", "Joyful laugh"])
 
     with st.expander("🌬️ Fisika & Lighting", expanded=True):
-        wind_power = st.select_slider("Kekuatan Angin:", options=["soft breeze", "gentle wind", "windy"])
+        wind_power = st.select_slider("Angin:", options=["soft breeze", "gentle wind", "windy"])
         lighting_fx = st.selectbox("Lighting:", ["Cinematic lighting", "Golden hour glow", "Studio professional", "Natural sunlight", "Moody atmosphere"])
         vfx_particles = st.selectbox("Efek VFX:", ["None", "Floating dust", "Falling petals", "Golden sparkles", "Cinematic rain"])
 
     bahasa = st.radio("Bahasa Output:", ("English", "Bahasa Indonesia"))
 
-# --- 6. MULTI-VIDEO UPLOADER (BATCH TETAP ADA) ---
-uploaded_files = st.file_uploader("Upload Video Referensi Tari (Batch)", type=["mp4", "mov", "avi"], accept_multiple_files=True)
+# --- 6. MULTI-VIDEO UPLOADER ---
+uploaded_files = st.file_uploader("Upload Video Referensi (Batch)", type=["mp4", "mov", "avi"], accept_multiple_files=True)
 
 if uploaded_files:
     cols = st.columns(min(len(uploaded_files), 3))
@@ -73,7 +93,8 @@ if uploaded_files:
 
     if st.button("🔥 GENERATE OFFICIAL GROK PROMPT", disabled=not st.session_state.api_active):
         st.session_state.all_prompts = [] 
-        model = genai.GenerativeModel(model_name="gemini-2.5-flash")
+        # PERBAIKAN: Gunakan nama model yang valid (1.5-flash-latest atau 2.0-flash-exp)
+        model = genai.GenerativeModel(model_name="gemini-1.5-flash-latest")
 
         for i, uploaded_file in enumerate(uploaded_files):
             with st.status(f"Grok-Style Precision Analysis: {uploaded_file.name}...") as status:
@@ -82,9 +103,10 @@ if uploaded_files:
                     with open(temp_path, "wb") as f: f.write(uploaded_file.getbuffer())
 
                     video_file = genai.upload_file(path=temp_path)
-                    while video_file.state.name == "PROCESSING": time.sleep(2); video_file = genai.get_file(video_file.name)
+                    while video_file.state.name == "PROCESSING": 
+                        time.sleep(2)
+                        video_file = genai.get_file(video_file.name)
 
-                    # Analisa per detik tetap dipertahankan
                     instruction = f"""
                     Analyze this dance choreography. The dance is '{dance_name if dance_name else "Unknown Trend"}'.
                     Task: Provide a highly detailed 1-second interval skeletal motion breakdown focusing on weight shift and limb trajectory.
@@ -93,12 +115,14 @@ if uploaded_files:
                     response = model.generate_content([video_file, instruction])
                     raw_motion = response.text
 
-                    # --- PROMPT BUILDER (OFFICIAL GROK FORMAT + EPIC FEATURES) ---
-                    tex_mantra = "Visible skin pores, realistic skin texture, subsurface scattering, micro-skin details. " if realism == "Hyper-Real" else "High detail skin texture. "
+                    # --- PROMPT BUILDER (OFFICIAL GROK FORMAT) ---
+                    tex_mantra = "Visible skin pores, realistic skin texture, subsurface scattering. " if realism == "Hyper-Real" else "High detail skin texture. "
                     soul_str = ", ".join(mannerisms)
                     vfx_str = f"{vfx_particles} particles in the air" if vfx_particles != "None" else "clear atmosphere"
                     
-                    # PROMPT 1 (0-10s)
+                    p1_text = raw_motion.split('---SEPARATOR---')[0].strip() if '---SEPARATOR---' in raw_motion else raw_motion
+                    p2_text = raw_motion.split('---SEPARATOR---')[1].strip() if '---SEPARATOR---' in raw_motion else "continuing the fluid dance sequence"
+
                     p1 = f"""A highly detailed cinematic 10-second video. 
 
 [SUBJEK UTAMA + AKSI]
@@ -108,7 +132,7 @@ A young woman as seen in the reference image is performing the '{dance_name}' ch
 Camera {cam_movement} in a {shot_type}, revealing smooth and {energy_lvl.lower()} transitions. {camera_gear} lens feel.
 
 [MOTION DETAIL]
-{raw_motion.split('---SEPARATOR---')[0].strip() if '---SEPARATOR---' in raw_motion else raw_motion}
+{p1_text}
 Every movement is natural with smooth motion. Human mannerisms: {soul_str}. {wind_power} effect on hair and outfit.
 
 [STYLE & MOOD]
@@ -117,7 +141,6 @@ Every movement is natural with smooth motion. Human mannerisms: {soul_str}. {win
 [TECHNICAL]
 Smooth motion, high quality, 10 seconds duration, 24fps, natural physics, no sudden jumps, coherent movement, latent space stabilization."""
 
-                    # PROMPT 2 (EXTEND 10-20s)
                     p2 = f"""Continue the previous 10-second video seamlessly for another 10 seconds.
 
 [LANJUTAN AKSI]
@@ -125,7 +148,7 @@ The woman continues the '{dance_name}' dance choreography naturally from the pre
 
 [MOTION CONTROL]
 - Camera movement: {cam_movement}
-- Character/Object motion: {raw_motion.split('---SEPARATOR---')[1].strip() if '---SEPARATOR---' in raw_motion else "continuing the fluid dance sequence"}, {soul_str}, {wind_power} blowing hair.
+- Character/Object motion: {p2_text}, {soul_str}, {wind_power} blowing hair.
 - Speed: {energy_lvl.lower()} cinematic pacing, no fast movements, coherent skeleton dynamics.
 
 [CONSISTENCY]
@@ -139,11 +162,12 @@ Maintain exact same character appearance, clothing, lighting, and environment fr
                     })
 
                     genai.delete_file(video_file.name); os.remove(temp_path)
-                    status.update(label=f"Analysis Complete: {uploaded_file.name}", state="complete")
+                    status.update(label=f"Done: {uploaded_file.name}", state="complete")
                 except Exception as e: st.error(f"Error: {e}")
 
-# --- 7. STUDIO DISPLAY (VISUAL PREVIEW TETAP ADA) ---
+# --- 7. STUDIO DISPLAY ---
 if st.session_state.all_prompts:
+    st.markdown("### 🚀 Final Motion Prompts")
     for idx, item in enumerate(st.session_state.all_prompts):
         with st.container():
             st.markdown(f'<div class="result-card"><h4>🎥 Video Reference: {item["name"]}</h4></div>', unsafe_allow_html=True)

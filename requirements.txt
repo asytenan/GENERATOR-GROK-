@@ -1,4 +1,7 @@
 streamlit
 google-generativeai
 yt-dlp
-ffmpeg
+opencv-python-headless
+moviepy
+Pillow
+numpy

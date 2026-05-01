@@ -5,10 +5,11 @@ import time
 import os
 import re
 import subprocess
+import json
 from datetime import datetime
 
 # ==================== PAGE CONFIG ====================
-st.set_page_config(page_title="GROK APEX V4", page_icon="⚡", layout="wide")
+st.set_page_config(page_title="GROK APEX V5", page_icon="⚡", layout="wide")
 
 # ==================== CUSTOM CSS ====================
 st.markdown("""
@@ -75,10 +76,28 @@ html, body, [data-testid="stAppViewContainer"] {
 </style>
 """, unsafe_allow_html=True)
 
+# ==================== LOAD API KEYS FROM FILE ====================
+def load_api_keys():
+    try:
+        if os.path.exists("api_keys.json"):
+            with open("api_keys.json", "r") as f:
+                return json.load(f)
+    except:
+        pass
+    return ["", "", ""]
+
+def save_api_keys(keys):
+    try:
+        with open("api_keys.json", "w") as f:
+            json.dump(keys, f)
+        return True
+    except:
+        return False
+
 # ==================== SESSION STATE ====================
 if 'all_prompts' not in st.session_state: st.session_state.all_prompts = []
-if 'api_keys' not in st.session_state: st.session_state.api_keys = ["", "", ""]
-if 'api_saved' not in st.session_state: st.session_state.api_saved = False
+if 'api_keys' not in st.session_state: st.session_state.api_keys = load_api_keys()
+if 'api_saved' not in st.session_state: st.session_state.api_saved = any(st.session_state.api_keys)
 if 'reference_videos' not in st.session_state: st.session_state.reference_videos = []
 if 'link_history' not in st.session_state: st.session_state.link_history = []
 if 'dance_names' not in st.session_state: st.session_state.dance_names = {}
@@ -132,50 +151,55 @@ def advanced_download(url: str):
     return video_bytes, song_name, "ready_video.mp4"
 
 # ==================== HEADER ====================
-st.markdown('<p class="main-header">GROK APEX V4</p>', unsafe_allow_html=True)
-st.markdown('<p style="text-align:center; color:#aaa; margin-top:-8px; font-size:1.05rem;">Music Control • Auto Caption • Prompt Choice • API Key Manager</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-header">GROK APEX V5</p>', unsafe_allow_html=True)
+st.markdown('<p style="text-align:center; color:#aaa; margin-top:-8px; font-size:1.05rem;">API Key Saved • Upload Manual (No FFmpeg) • Music Control • Auto Caption</p>', unsafe_allow_html=True)
 
-# ==================== API KEY MANAGER ====================
+# ==================== API KEY MANAGER (LOCAL STORAGE) ====================
 with st.container():
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    st.markdown("### 🔑 API KEY MANAGER")
+    st.markdown("### 🔑 API KEY MANAGER (Tersimpan Permanen)")
 
     col1, col2, col3 = st.columns(3)
     with col1:
         st.session_state.api_keys[0] = st.text_input("API Key 1", value=st.session_state.api_keys[0], type="password", key="key1")
         if st.button("🗑️ Hapus Key 1", key="del_key1"):
             st.session_state.api_keys[0] = ""
+            save_api_keys(st.session_state.api_keys)
             st.rerun()
     with col2:
         st.session_state.api_keys[1] = st.text_input("API Key 2 (Optional)", value=st.session_state.api_keys[1], type="password", key="key2")
         if st.button("🗑️ Hapus Key 2", key="del_key2"):
             st.session_state.api_keys[1] = ""
+            save_api_keys(st.session_state.api_keys)
             st.rerun()
     with col3:
         st.session_state.api_keys[2] = st.text_input("API Key 3 (Optional)", value=st.session_state.api_keys[2], type="password", key="key3")
         if st.button("🗑️ Hapus Key 3", key="del_key3"):
             st.session_state.api_keys[2] = ""
+            save_api_keys(st.session_state.api_keys)
             st.rerun()
 
     col_save, col_status = st.columns([1, 3])
     with col_save:
         if st.button("💾 SIMPAN API KEYS", type="primary"):
-            st.session_state.api_saved = True
-            st.success("✅ API Keys berhasil disimpan!")
+            if save_api_keys(st.session_state.api_keys):
+                st.session_state.api_saved = True
+                st.success("✅ API Keys berhasil disimpan permanen!")
+            else:
+                st.error("❌ Gagal menyimpan API Keys")
     with col_status:
         if st.session_state.api_saved:
             active = len([k for k in st.session_state.api_keys if k.strip()])
-            st.success(f"✅ {active} API Key tersimpan")
+            st.success(f"✅ {active} API Key tersimpan permanen")
         else:
             st.info("⚠️ Klik 'Simpan' setelah memasukkan API Key")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ==================== SIDEBAR (MASTER CONTROL) ====================
+# ==================== SIDEBAR ====================
 with st.sidebar:
     st.markdown("## 🎛️ MASTER CONTROL")
     
-    # === BASIC ===
     style = st.selectbox("🎨 Visual Style", ["Hyper-Realistic", "Cinematic", "TikTok Viral", "Film Look"])
     camera = st.selectbox("📷 Camera Movement", [
         "Static", "Slow Zoom In", "Gentle Pan", "Handheld",
@@ -186,7 +210,7 @@ with st.sidebar:
 
     st.markdown("---")
     
-    # === MUSIC CONTROL (BARU) ===
+    # === MUSIC CONTROL ===
     st.markdown("### 🎵 Music Control")
     manual_music = st.text_input("Nama Lagu / Musik (Manual)", placeholder="Kosongkan jika ingin otomatis")
     st.caption("Jika diisi manual, akan menggantikan deteksi otomatis")
@@ -230,7 +254,7 @@ with st.sidebar:
 
     st.markdown("---")
     
-    # === WIND & HAIR FLOW (BARU) ===
+    # === WIND & HAIR FLOW ===
     st.markdown("### 🌬️ Wind & Hair Flow")
     wind = st.selectbox(
         "Kekuatan Angin:",
@@ -282,13 +306,13 @@ with st.sidebar:
         st.info("Belum ada history")
 
 # ==================== 🚀 BATCH INSTANT LINK ====================
-st.markdown("### 🚀 BATCH INSTANT LINK")
+st.markdown("### 🚀 BATCH INSTANT LINK (Support Semua Platform)")
 
 with st.container():
     st.markdown('<div class="instant-box">', unsafe_allow_html=True)
-    st.markdown("**Paste banyak link (satu per baris) → Otomatis masuk ke Ready + History**")
+    st.markdown("**Support: TikTok HP/Desktop, Instagram HP/Desktop, YouTube, Facebook, Twitter, dll**")
 
-    links_text = st.text_area("🔗 Paste Links (satu per baris)", height=100, placeholder="https://www.tiktok.com/@user/video/111\nhttps://www.tiktok.com/@user/video/222")
+    links_text = st.text_area("🔗 Paste Links (satu per baris)", height=100, placeholder="https://www.tiktok.com/@user/video/111\nhttps://www.instagram.com/reel/xxx\nhttps://youtube.com/shorts/yyy")
 
     if st.button("🚀 PROCESS ALL LINKS", key="batch_btn"):
         if links_text.strip():
@@ -358,12 +382,14 @@ with st.container():
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ==================== 📤 MANUAL UPLOAD ====================
-st.markdown("### 📤 MANUAL UPLOAD")
+# ==================== 📤 MANUAL UPLOAD (TANPA FFMPEG) ====================
+st.markdown("### 📤 MANUAL UPLOAD (Tanpa FFmpeg - Langsung Pakai)")
 
 with st.container():
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    uploaded = st.file_uploader("Upload Video Manual", type=["mp4", "mov"], accept_multiple_files=True)
+    st.info("⚡ Upload manual tidak melalui ffmpeg. Langsung pakai video apa adanya.")
+
+    uploaded = st.file_uploader("Upload Video Manual (MP4/MOV)", type=["mp4", "mov"], accept_multiple_files=True)
 
     if uploaded:
         for i, file in enumerate(uploaded):
@@ -372,31 +398,22 @@ with st.container():
                 st.video(file)
             with col2:
                 st.caption(file.name)
-                if st.button(f"🔧 Fix + Tambah", key=f"fix_{i}"):
-                    with st.spinner("Processing..."):
-                        temp_in = f"temp_in_{i}.mp4"
-                        with open(temp_in, "wb") as f: f.write(file.getbuffer())
-                        try:
-                            video_bytes, song_name, _ = advanced_download(temp_in)
-                            st.session_state.reference_videos.append({
-                                "name": song_name,
-                                "bytes": video_bytes,
-                                "filename": file.name,
-                                "source": "manual"
-                            })
-                            st.session_state.dance_names[song_name] = song_name
-                            st.success("✅ Ditambahkan!")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Gagal: {e}")
-                        finally:
-                            if os.path.exists(temp_in): os.remove(temp_in)
+                if st.button(f"✅ Tambah ke Ready", key=f"add_manual_{i}"):
+                    st.session_state.reference_videos.append({
+                        "name": file.name,
+                        "bytes": file.getbuffer(),
+                        "filename": file.name,
+                        "source": "manual"
+                    })
+                    st.session_state.dance_names[file.name] = file.name
+                    st.success("✅ Ditambahkan ke Ready to Generate!")
+                    st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ==================== 🔥 GENERATE ====================
 if st.button("🔥 GENERATE OFFICIAL PROMPT", disabled=not st.session_state.api_saved or len(st.session_state.reference_videos) == 0):
     st.session_state.all_prompts = []
-    st.session_state.captions = {}
+    st.session_state.captions = []
     
     active_keys = [k for k in st.session_state.api_keys if k.strip().startswith("AIza")]
     if not active_keys:
@@ -418,9 +435,6 @@ if st.button("🔥 GENERATE OFFICIAL PROMPT", disabled=not st.session_state.api_
             name = video["name"]
             song = st.session_state.dance_names.get(name, name)
 
-            # Gunakan manual music jika diisi
-            final_song = manual_music if manual_music.strip() else song
-
             with st.status(f"Analyzing {name} (Key {key_idx+1})...") as status:
                 try:
                     temp_path = f"temp_{name.replace(' ', '_')}.mp4"
@@ -431,19 +445,7 @@ if st.button("🔥 GENERATE OFFICIAL PROMPT", disabled=not st.session_state.api_
                         time.sleep(2)
                         vf = genai.get_file(vf.name)
 
-                    # === BUILD ADVANCED PROMPT ===
-                    quirks = ", ".join(mannerisms) if mannerisms else "natural human movement"
-                    vfx_str = f"{vfx} particles in the air" if vfx != "None" else "clear atmosphere"
-                    wind_str = f"{wind} blowing hair and clothes" if wind != "None" else "still air"
-                    
-                    if multi_angle:
-                        shot_p1 = "Wide Shot (Full Body) for the first 7 seconds, then smooth zoom to Medium Shot (Waist Up) for the remaining 3 seconds"
-                        shot_p2 = "Close-up shot focusing on facial expression and upper body movement"
-                    else:
-                        shot_p1 = "Full Body Wide Shot throughout"
-                        shot_p2 = "Full Body Wide Shot throughout"
-
-                    analysis_prompt = f"""Analyze this dance video. Trend/Song: {final_song}.
+                    analysis_prompt = f"""Analyze this dance video. Trend/Song: {song}.
 Provide detailed 1-second skeletal motion breakdown with:
 - Motion Trajectory (jalur gerakan tangan & kaki)
 - Weight Distribution (perpindahan berat badan)
@@ -455,46 +457,41 @@ Separate Part 1 (0-10s) and Part 2 (10-20s) with '---SEPARATOR---'."""
                     part1 = raw.split("---SEPARATOR---")[0].strip() if "---SEPARATOR---" in raw else raw
                     part2 = raw.split("---SEPARATOR---")[1].strip() if "---SEPARATOR---" in raw else "continuing smoothly"
 
-                    # === PROMPT 1 - ORIGINAL ===
                     p1 = f"""Cinematic 10-second video.
-[SUBJECT] Young woman dancing '{final_song}' in exact same outfit and location from reference.
-[CAMERA] {camera}. {shot_p1}.
-[MOTION] {part1}. {quirks}.
+[SUBJECT] Young woman dancing '{song}' in exact same outfit and location from reference.
+[CAMERA] {camera}.
+[MOTION] {part1}
 [STYLE] {style}, {lighting}, {color_grade} color grade, {vfx_str}, {wind_str}, realistic film look, natural physics, high detail.
 [VISUAL LOCK] Strictly maintain exact character, clothing, and background.
-[TECHNICAL] 24fps, smooth motion, coherent movement, Temporal Consistency, Latent Space Stabilization, {negative_prompt}."""
+[TECHNICAL] 24fps, smooth motion, coherent movement, Temporal Consistency, Latent Space Stabilization."""
 
-                    # === PROMPT 2 - EXTEND ===
                     p2 = f"""Seamless continuation for another 10 seconds.
-[CONTINUATION] {part2}. {quirks}.
-[CAMERA] {camera}. {shot_p2}.
+[CONTINUATION] {part2}
 [CONSISTENCY] Same character, lighting, outfit, and environment.
 [TECHNICAL] 24fps, smooth motion, coherent movement, Temporal Consistency."""
 
-                    # === PROMPT 3 - IMAGE-TO-VIDEO OPTIMIZED (MAIN) ===
-                    p3 = f"""Cinematic 10-second video of a young woman dancing '{final_song}' in the exact same outfit and location as the reference image.
+                    p3 = f"""Cinematic 10-second video of a young woman dancing '{song}' in the exact same outfit and location as the reference image.
 
-Camera: {camera}. {shot_p1}. Smooth and natural movement with realistic physics and weight distribution. Highly detailed skin with visible pores and subsurface scattering. Film grain, natural lighting, {color_grade} color grade.
+Camera: {camera}. Smooth and natural movement with realistic physics and weight distribution. Highly detailed skin with visible pores and subsurface scattering. Film grain, natural lighting, {color_grade} color grade.
 
 Strict visual consistency with the reference image as the first frame. No morphing, no sudden changes.
 
 {part1[:400]}..."""
 
-                    # === PROMPT 4 - IMAGE-TO-VIDEO OPTIMIZED (EXTEND) ===
                     p4 = f"""Seamless 10-second continuation of the previous clip.
 
 Smooth camera movement, natural physics, weight shift, and coherent motion. Maintain exact same character, lighting, and environment. {color_grade} color grade.
 
 {part2[:350]}..."""
 
-                    # === AUTO TIKTOK CAPTION ===
-                    caption_prompt = f"Buatkan caption viral TikTok + 5 hashtag untuk video tari dengan lagu '{final_song}'. Buat dalam bahasa Indonesia, singkat, dan menarik."
+                    # Auto Caption
+                    caption_prompt = f"Buatkan caption viral TikTok + 5 hashtag untuk video tari dengan lagu '{song}'. Buat dalam bahasa Indonesia, singkat, dan menarik."
                     caption_response = model.generate_content(caption_prompt)
                     caption = caption_response.text
 
                     st.session_state.all_prompts.append({
                         "name": name,
-                        "song": final_song,
+                        "song": song,
                         "p1": p1,
                         "p2": p2,
                         "p3": p3,
@@ -511,11 +508,10 @@ Smooth camera movement, natural physics, weight shift, and coherent motion. Main
                 except Exception as e:
                     st.error(f"Error analyzing {name}: {e}")
 
-# ==================== RESULTS + PILIHAN PROMPT + CAPTION ====================
+# ==================== RESULTS + PILIHAN PROMPT ====================
 if st.session_state.all_prompts:
     st.markdown("### 📜 FINAL PROMPTS (Pilih Versi yang Kamu Suka)")
 
-    # Tombol Clear Content
     if st.button("🗑️ CLEAR ALL CONTENT", type="secondary"):
         st.session_state.all_prompts = []
         st.session_state.captions = []
@@ -526,7 +522,6 @@ if st.session_state.all_prompts:
             st.markdown('<div class="glass-card">', unsafe_allow_html=True)
             st.subheader(f"🎥 {item['name']}")
 
-            # PILIHAN PROMPT
             prompt_choice = st.radio(
                 "Pilih Versi Prompt:",
                 [
@@ -555,7 +550,6 @@ if st.session_state.all_prompts:
                     if st.button(f"📋 Copy Extend Optimized", key=f"copy_extend_{i}"):
                         st.toast("✅ Prompt berhasil disalin!")
 
-            # AUTO TIKTOK CAPTION (TERPISAH)
             if item['name'] in st.session_state.captions:
                 st.markdown("**📱 Auto TikTok Caption + Hashtag:**")
                 st.code(st.session_state.captions[item['name']])
@@ -565,4 +559,4 @@ if st.session_state.all_prompts:
             st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown("---")
-st.markdown("<p style='text-align:center; color:#666; font-size:0.85rem;'>GROK APEX V4 • Music Control + Auto Caption + Prompt Choice • Powered by Gemini + yt-dlp + FFmpeg</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:#666; font-size:0.85rem;'>GROK APEX V5 • API Key Saved + Upload Manual (No FFmpeg) • Powered by Gemini + yt-dlp + FFmpeg</p>", unsafe_allow_html=True)

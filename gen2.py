@@ -440,29 +440,25 @@ if st.button("🔥 GENERATE OFFICIAL PROMPT", disabled=not st.session_state.api_
         model = genai.GenerativeModel("gemini-2.5-flash")
 
         for video in chunks[key_idx]:
-            # Ultra safe type checking
+            # Convert everything to a safe dict format
             try:
                 if isinstance(video, dict):
-                    name = str(video.get("name", "Unknown"))
-                    raw_bytes = video.get("bytes", b"")
-                    video_bytes = raw_bytes if isinstance(raw_bytes, bytes) else bytes(raw_bytes) if raw_bytes else b""
+                    safe_video = video
+                elif hasattr(video, '__dict__'):
+                    safe_video = video.__dict__
                 elif hasattr(video, 'getbuffer'):
-                    name = str(getattr(video, 'name', 'Unknown'))
-                    video_bytes = bytes(video.getbuffer())
+                    safe_video = {"name": getattr(video, 'name', 'Unknown'), "bytes": bytes(video.getbuffer())}
                 elif isinstance(video, (list, tuple)):
                     if len(video) >= 2:
-                        name = str(video[0]) if video[0] else "Unknown"
-                        raw_bytes = video[1] if len(video) > 1 else b""
-                        video_bytes = raw_bytes if isinstance(raw_bytes, bytes) else bytes(raw_bytes) if raw_bytes else b""
+                        safe_video = {"name": str(video[0]) if video[0] else "Unknown", "bytes": video[1] if len(video) > 1 else b""}
                     else:
-                        name = "Unknown"
-                        video_bytes = b""
-                elif isinstance(video, (bytes, bytearray)):
-                    name = "Unknown"
-                    video_bytes = bytes(video)
+                        safe_video = {"name": "Unknown", "bytes": b""}
                 else:
-                    name = str(video)
-                    video_bytes = b""
+                    safe_video = {"name": str(video), "bytes": b""}
+                
+                name = str(safe_video.get("name", "Unknown"))
+                raw_bytes = safe_video.get("bytes", b"")
+                video_bytes = raw_bytes if isinstance(raw_bytes, bytes) else bytes(raw_bytes) if raw_bytes else b""
             except Exception as e:
                 st.error(f"Error processing video item: {e}")
                 continue

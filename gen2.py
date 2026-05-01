@@ -291,7 +291,7 @@ with st.sidebar:
                     if st.button("🔄 Pakai", key=f"use_h_{i}"):
                         st.session_state.reference_videos.append({
                             "name": item['song'],
-                            "bytes": item['bytes'],
+                            "bytes": bytes(item['bytes']) if not isinstance(item['bytes'], bytes) else item['bytes'],
                             "filename": item['filename'],
                             "source": "history"
                         })
@@ -369,7 +369,9 @@ with st.container():
         for i, vid in enumerate(st.session_state.reference_videos):
             col1, col2, col3 = st.columns([4, 1.5, 0.5])
             with col1:
-                st.video(vid["bytes"])
+                # Fix: ensure bytes type for st.video
+                video_data = vid["bytes"] if isinstance(vid["bytes"], bytes) else bytes(vid["bytes"])
+                st.video(video_data)
                 st.caption(f"🎵 {vid['name']}")
             with col2:
                 if st.button("🗑️ Hapus", key=f"del_r_{i}"):
@@ -401,7 +403,7 @@ with st.container():
                 if st.button(f"✅ Tambah ke Ready", key=f"add_manual_{i}"):
                     st.session_state.reference_videos.append({
                         "name": file.name,
-                        "bytes": file.getbuffer(),
+                        "bytes": bytes(file.getbuffer()),  # Fix: convert memoryview to bytes
                         "filename": file.name,
                         "source": "manual"
                     })
@@ -438,7 +440,8 @@ if st.button("🔥 GENERATE OFFICIAL PROMPT", disabled=not st.session_state.api_
             with st.status(f"Analyzing {name} (Key {key_idx+1})...") as status:
                 try:
                     temp_path = f"temp_{name.replace(' ', '_')}.mp4"
-                    with open(temp_path, "wb") as f: f.write(video["bytes"])
+                    video_data = video["bytes"] if isinstance(video["bytes"], bytes) else bytes(video["bytes"])
+                    with open(temp_path, "wb") as f: f.write(video_data)
 
                     vf = genai.upload_file(path=temp_path)
                     while vf.state.name == "PROCESSING":
@@ -535,7 +538,9 @@ if st.session_state.all_prompts:
 
             c1, c2 = st.columns([1, 2])
             with c1:
-                st.video(item['video'])
+                # Fix: ensure bytes type for st.video
+                video_data = item['video'] if isinstance(item['video'], bytes) else bytes(item['video'])
+                st.video(video_data)
             with c2:
                 if prompt_choice == "Original (Detail)":
                     t1, t2 = st.tabs(["Prompt 1 (10s)", "Prompt 2 (Extend)"])

@@ -448,6 +448,12 @@ if st.button("🔥 GENERATE OFFICIAL PROMPT", disabled=not st.session_state.api_
                         time.sleep(2)
                         vf = genai.get_file(vf.name)
 
+                    # Define vfx_str and wind_str (with fallback)
+                    vfx_val = vfx if 'vfx' in dir() else "None"
+                    wind_val = wind if 'wind' in dir() else "None"
+                    vfx_str = f"{vfx_val} particles in the air" if vfx_val != "None" else "clear atmosphere"
+                    wind_str = f"{wind_val} blowing hair and clothes" if wind_val != "None" else "still air"
+
                     analysis_prompt = f"""Analyze this dance video. Trend/Song: {song}.
 Provide detailed 1-second skeletal motion breakdown with:
 - Motion Trajectory (jalur gerakan tangan & kaki)

@@ -434,14 +434,21 @@ if st.button("🔥 GENERATE OFFICIAL PROMPT", disabled=not st.session_state.api_
         model = genai.GenerativeModel("gemini-2.5-flash")
 
         for video in chunks[key_idx]:
-            name = video["name"]
+            # Handle both dict and UploadedFile
+            if isinstance(video, dict):
+                name = video["name"]
+                video_bytes = video["bytes"]
+            else:
+                # UploadedFile object
+                name = video.name
+                video_bytes = bytes(video.getbuffer())
+            
             song = st.session_state.dance_names.get(name, name)
 
             with st.status(f"Analyzing {name} (Key {key_idx+1})...") as status:
                 try:
                     temp_path = f"temp_{name.replace(' ', '_')}.mp4"
-                    video_data = video["bytes"] if isinstance(video["bytes"], bytes) else bytes(video["bytes"])
-                    with open(temp_path, "wb") as f: f.write(video_data)
+                    with open(temp_path, "wb") as f: f.write(video_bytes)
 
                     vf = genai.upload_file(path=temp_path)
                     while vf.state.name == "PROCESSING":
@@ -505,7 +512,7 @@ Smooth camera movement, natural physics, weight shift, and coherent motion. Main
                         "p2": p2,
                         "p3": p3,
                         "p4": p4,
-                        "video": video["bytes"]
+                        "video": video_bytes
                     })
 
                     st.session_state.captions[name] = caption

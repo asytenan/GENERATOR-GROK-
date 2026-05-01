@@ -440,18 +440,30 @@ if st.button("🔥 GENERATE OFFICIAL PROMPT", disabled=not st.session_state.api_
         model = genai.GenerativeModel("gemini-2.5-flash")
 
         for video in chunks[key_idx]:
-            # Handle dict, UploadedFile, and other types
-            if isinstance(video, dict):
-                name = video["name"]
-                video_bytes = video["bytes"] if isinstance(video["bytes"], bytes) else bytes(video["bytes"])
-            elif hasattr(video, 'getbuffer'):
-                # UploadedFile object
-                name = video.name
-                video_bytes = bytes(video.getbuffer())
-            else:
-                # Fallback for other types
-                name = str(video)
-                video_bytes = bytes(video) if not isinstance(video, bytes) else video
+            # Robust type checking
+            try:
+                if isinstance(video, dict):
+                    name = video.get("name", "Unknown")
+                    raw_bytes = video.get("bytes", b"")
+                    video_bytes = raw_bytes if isinstance(raw_bytes, bytes) else bytes(raw_bytes)
+                elif hasattr(video, 'getbuffer'):
+                    name = getattr(video, 'name', 'Unknown')
+                    video_bytes = bytes(video.getbuffer())
+                elif isinstance(video, (list, tuple)):
+                    # Handle list/tuple case
+                    if len(video) >= 2:
+                        name = str(video[0]) if video[0] else "Unknown"
+                        raw_bytes = video[1] if len(video) > 1 else b""
+                        video_bytes = raw_bytes if isinstance(raw_bytes, bytes) else bytes(raw_bytes)
+                    else:
+                        name = "Unknown"
+                        video_bytes = b""
+                else:
+                    name = str(video)
+                    video_bytes = bytes(video) if not isinstance(video, bytes) else video
+            except Exception as e:
+                st.error(f"Error processing video item: {e}")
+                continue
             
             song = st.session_state.dance_names.get(name, name)
 

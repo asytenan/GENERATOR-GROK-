@@ -369,10 +369,16 @@ with st.container():
         for i, vid in enumerate(st.session_state.reference_videos):
             col1, col2, col3 = st.columns([4, 1.5, 0.5])
             with col1:
-                # Fix: ensure bytes type for st.video
-                video_data = vid["bytes"] if isinstance(vid["bytes"], bytes) else bytes(vid["bytes"])
+                # Handle both dict and other types
+                if isinstance(vid, dict):
+                    video_data = vid["bytes"] if isinstance(vid["bytes"], bytes) else bytes(vid["bytes"])
+                    name = vid["name"]
+                else:
+                    video_data = bytes(vid.getbuffer()) if hasattr(vid, 'getbuffer') else bytes(vid)
+                    name = vid.name if hasattr(vid, 'name') else str(vid)
+                
                 st.video(video_data)
-                st.caption(f"🎵 {vid['name']}")
+                st.caption(f"🎵 {name}")
             with col2:
                 if st.button("🗑️ Hapus", key=f"del_r_{i}"):
                     st.session_state.reference_videos.pop(i)
@@ -434,14 +440,18 @@ if st.button("🔥 GENERATE OFFICIAL PROMPT", disabled=not st.session_state.api_
         model = genai.GenerativeModel("gemini-2.5-flash")
 
         for video in chunks[key_idx]:
-            # Handle both dict and UploadedFile
+            # Handle dict, UploadedFile, and other types
             if isinstance(video, dict):
                 name = video["name"]
-                video_bytes = video["bytes"]
-            else:
+                video_bytes = video["bytes"] if isinstance(video["bytes"], bytes) else bytes(video["bytes"])
+            elif hasattr(video, 'getbuffer'):
                 # UploadedFile object
                 name = video.name
                 video_bytes = bytes(video.getbuffer())
+            else:
+                # Fallback for other types
+                name = str(video)
+                video_bytes = bytes(video) if not isinstance(video, bytes) else video
             
             song = st.session_state.dance_names.get(name, name)
 

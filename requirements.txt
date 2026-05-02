@@ -5,3 +5,6 @@ opencv-python-headless
 moviepy
 Pillow
 numpy
+librosa
+soundfile
+ffmpeg-python
